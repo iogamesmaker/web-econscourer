@@ -1,35 +1,14 @@
-// Constants and State
-const ITEM_DB = [
-    [1, "Iron"], [2, "Explosives"], [4, "Rubber"], [5, "Flux"], [6, "Fuel"],
-    [49, "Compressed Explosives"], [50, "Compressed Iron"], [51, "Volleyball"],
-    [52, "Golden Volleyball"], [53, "Basketball"], [54, "Golden Basketball"],
-    [55, "Beachball"], [56, "Football"], [100, "Wrench"], [101, "Shredder"],
-    [102, "Golden Shredder"], [103, "Repair Tool"], [104, "Handheld Pusher"],
-    [105, "Shield Booster"], [106, "Embiggener"], [107, "Shrinkinator"],
-    [108, "Backpack"], [109, "Speed Skates"], [110, "Booster Boots"],
-    [111, "Launcher Gauntlets"], [112, "Construction Gauntlets"], [113, "Rocketpack"],
-    [114, "Hoverpack"], [115, "Manifest"], [116, "BOM"], [120, "Blueprint Scanner"],
-    [122, "RCD"], [123, "Shield Core"], [150, "Standard Ammo"], [151, "Scattershot Ammo"],
-    [152, "Flak Ammo"], [153, "Sniper Ammo"], [154, "Punch Ammo"], [155, "Yank Ammo"],
-    [156, "Slug Ammo"], [159, "Booster Fuel (low)"], [160, "Booster Fuel (high)"],
-    [162, "Rapid Fire"], [163, "Rapid Fire Depleted"], [164, "Preservation"],
-    [165, "Preservation Depleted"], [166, "Cooling Cell"], [167, "Hot Cooling Cell"],
-    [168, "Burst Charge"], [215, "Helm"], [217, "Comms"], [218, "Sign"],
-    [219, "Spawn"], [220, "Door"], [221, "Cargo Hatch"], [223, "Cargo Ejector"],
-    [224, "Turret Controller"], [226, "Cannon / RC"], [228, "Burst"], [229, "Machine / Auto"],
-    [230, "Thruster"], [232, "Iron block"], [233, "Rubber block"], [234, "Ice / Glass block"],
-    [235, "Ladder"], [236, "Walkway"], [237, "Item net"], [239, "Paint"],
-    [240, "Expando box"], [241, "Safety anchor"], [242, "Pusher"], [243, "Item launcher"],
-    [245, "Recycler"], [246, "Legacy"], [248, "Munitions fabricator"], [249, "Engineering fabricator"],
-    [251, "Equipment fabricator"], [252, "Loader"], [253, "Lockdown override unit"],
-    [255, "Fluid Tank"], [256, "Shield Generator"], [257, "Shield Projector"],
-    [258, "Enhanced Turret Controller"], [262, "Logistic Rail"], [263, "Acute"],
-    [264, "MSU / Munition supply unit"], [265, "Obtuse"], [305, "Golden Null"], [307, "Silver Null"],
-    [306, "Bug Hunter"], [326, "Open lootbox"], [327, "Closed lootbox"],
-    [225, "Manual turret (Deprecated)"], [3, "Silica (Deprecated)"],
-    [250, "Machine Fabricator (Deprecated)"], [100000, "Unknown Item"],
-    [244, "Old Loader"]
-];
+// Import modules
+import { STATE } from './state.js';
+import { ITEM_DB } from './constants.js';
+import {
+    updateStatus,
+    showNotice,
+    formatDate,
+        formatTimestamp,
+            formatZone,
+                formatEntity
+} from './utils.js';
 
 const STATE = {
     rawData: [],
@@ -38,7 +17,7 @@ const STATE = {
     settings: {
         fontSize: 12,
         wrapText: false,
-        showBots: true,
+        showBots: false,
         useShipNames: false
     },
     downloading: false,
