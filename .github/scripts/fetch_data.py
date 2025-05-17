@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 def fetch_data():
     # Get yesterday's date (since data is for previous 24 hours)
     date = datetime.now(timezone.utc) - timedelta(days=1)
-    date_str = date.strftime('%Y_%m_%d')
+    date_str = date.strftime('%Y_%-m_%-d')
 
     print(f"Fetching data for {date_str}")
 
