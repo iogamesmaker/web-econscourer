@@ -6,9 +6,6 @@ from datetime import datetime, timedelta
 import time
 
 def fetch_data():
-    # Add delay to ensure data is available
-    time.sleep(300)  # Wait 5 minutes after UTC midnight
-    
     # Get yesterday's date (since data is for previous 24 hours)
     date = datetime.utcnow() - timedelta(days=1)
     date_str = date.strftime('%Y_%m_%d')
