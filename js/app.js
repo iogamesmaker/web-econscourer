@@ -10,11 +10,19 @@ async function fetchTodayData() {
     const day = String(date.getUTCDate()).padStart(2, '0');
     
     try {
-        // Fetch summary data
+        // Fetch from our local data instead of pub.drednot.io
         const summaryResponse = await fetch(
-            `https://pub.drednot.io/prod/econ/${year}_${month}_${day}/summary.json`
+            `data/summary_${year}_${month}_${day}.json`
         );
+        
+        if (!summaryResponse.ok) {
+            throw new Error('Latest data not yet available');
+        }
+        
         const summaryData = await summaryResponse.json();
+        
+        // Store the data for search functionality
+        currentData = summaryData;
         
         // Update UI with summary data
         updateSummaryDisplay(summaryData);
@@ -27,95 +35,32 @@ async function fetchTodayData() {
         
     } catch (error) {
         console.error('Error fetching data:', error);
+        // Try to fetch yesterday's data as fallback
+        const yesterday = new Date(date);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayYear = yesterday.getUTCFullYear();
+        const yesterdayMonth = String(yesterday.getUTCMonth() + 1).padStart(2, '0');
+        const yesterdayDay = String(yesterday.getUTCDate()).padStart(2, '0');
+        
+        try {
+            const fallbackResponse = await fetch(
+                `data/summary_${yesterdayYear}_${yesterdayMonth}_${yesterdayDay}.json`
+            );
+            if (!fallbackResponse.ok) {
+                throw new Error('No recent data available');
+            }
+            const fallbackData = await fallbackResponse.json();
+            currentData = fallbackData;
+            updateSummaryDisplay(fallbackData);
+            createCharts(fallbackData);
+            buildSearchIndex(fallbackData);
+            
+            // Show notice about using older data
+            document.getElementById('summary').insertAdjacentHTML('beforebegin', 
+                '<div class="notice">Showing yesterday\'s data. Today\'s data will be available soon.</div>'
+            );
+        } catch (fallbackError) {
+            document.getElementById('summary').innerHTML = '<div class="error">Unable to load economic data. Please try again later.</div>';
+        }
     }
 }
-
-function updateSummaryDisplay(data) {
-    const summaryElement = document.getElementById('summary-stats');
-    summaryElement.innerHTML = `
-        <p>Total Ships: ${data.count_ships}</p>
-        <p>Total Logs: ${data.count_logs}</p>
-    `;
-}
-
-function createCharts(data) {
-    // Create item distribution chart
-    const itemChart = new Chart(
-        document.getElementById('itemDistributionChart'),
-        {
-            type: 'bar',
-            data: {
-                labels: Object.keys(data.items_held),
-                datasets: [{
-                    label: 'Items Held',
-                    data: Object.values(data.items_held)
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false
-            }
-        }
-    );
-    
-    // Create activity chart for new items
-    const activityChart = new Chart(
-        document.getElementById('activityChart'),
-        {
-            type: 'line',
-            data: {
-                labels: data.items_new.map(item => item.zone),
-                datasets: [{
-                    label: 'Items Generated',
-                    data: data.items_new.map(item => item.total)
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false
-            }
-        }
-    );
-}
-
-function buildSearchIndex(data) {
-    searchIndex = lunr(function() {
-        this.field('zone');
-        this.field('item');
-        this.field('source');
-        
-        // Add documents to index
-        data.items_new.forEach((item, index) => {
-            this.add({
-                id: index,
-                zone: item.zone,
-                item: item.item,
-                source: item.src
-            });
-        });
-    });
-}
-
-// Initialize search handler
-document.getElementById('search').addEventListener('input', (e) => {
-    const query = e.target.value;
-    if (query.length < 2) return;
-    
-    const results = searchIndex.search(query);
-    // Update UI with search results
-    displaySearchResults(results);
-});
-
-function displaySearchResults(results) {
-    const container = document.getElementById('data-container');
-    container.innerHTML = results.map(result => `
-        <div class="search-result">
-            <h3>Item: ${currentData.items_new[result.ref].item}</h3>
-            <p>Zone: ${currentData.items_new[result.ref].zone}</p>
-            <p>Source: ${currentData.items_new[result.ref].src}</p>
-        </div>
-    `).join('');
-}
-
-// Initial load
-fetchTodayData();
