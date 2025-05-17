@@ -3,61 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Drednot.io Economic Data Explorer</title>
+    <title>Drednot Economy Data</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <header>
-        <h1>Drednot.io Economic Data Explorer</h1>
-        <div id="date-controls">
-            <button id="prev-day">←</button>
-            <input type="date" id="date-picker" min="2022-11-23">
-            <button id="next-day">→</button>
-            <button id="go-to-latest">Latest</button>
-        </div>
-    </header>
-
-    <main>
-        <div id="loading" class="hidden">Loading data...</div>
-
-        <div id="data-tabs">
-            <button class="tab-button active" data-tab="summary">Summary</button>
-            <button class="tab-button" data-tab="ships">Ships</button>
-            <button class="tab-button" data-tab="log">Log</button>
-        </div>
-
-        <div id="data-view">
-            <div id="summary-view" class="tab-content active">
-                <div id="summary-data"></div>
+    <div class="container">
+        <header>
+            <h1>Drednot Economy Data Viewer</h1>
+            <div class="date-info">
+                <span id="lastUpdate">Last Update: Loading...</span>
             </div>
+        </header>
 
-            <div id="ships-view" class="tab-content">
-                <div id="ships-controls">
-                    <input type="text" id="ships-search" placeholder="Search ships...">
-                    <select id="ships-sort">
-                        <option value="name">Sort by Name</option>
-                        <option value="price">Sort by Price</option>
-                        <option value="type">Sort by Type</option>
-                    </select>
+        <div class="controls">
+            <!-- Item Filter Section -->
+            <div class="filter-section">
+                <label for="itemFilter">Item Filter:</label>
+                <div class="search-container">
+                    <input type="text" id="itemFilter" placeholder="Search items...">
+                    <div id="itemSuggestions" class="suggestions"></div>
                 </div>
-                <div id="ships-data"></div>
-                <div id="ships-pagination"></div>
             </div>
 
-            <div id="log-view" class="tab-content">
-                <div id="log-controls">
-                    <input type="text" id="log-search" placeholder="Search log entries...">
-                    <select id="log-type-filter">
-                        <option value="all">All Types</option>
-                        <!-- Populated dynamically -->
-                    </select>
+            <!-- Source/Destination Filters -->
+            <div class="filter-section">
+                <div class="filter-group">
+                    <label for="sourceFilter">Source:</label>
+                    <input type="text" id="sourceFilter" placeholder="Filter by source...">
                 </div>
-                <div id="log-data"></div>
-                <div id="log-pagination"></div>
+                <div class="filter-group">
+                    <label for="destFilter">Destination:</label>
+                    <input type="text" id="destFilter" placeholder="Filter by destination...">
+                </div>
+            </div>
+
+            <!-- Options -->
+            <div class="options-section">
+                <label class="checkbox-container">
+                    <input type="checkbox" id="showBots" checked>
+                    <span class="checkmark"></span>
+                    Only show ship transactions
+                </label>
+                <label class="checkbox-container">
+                    <input type="checkbox" id="useShipNames">
+                    <span class="checkmark"></span>
+                    Use ship names
+                </label>
+            </div>
+
+            <!-- Date Range -->
+            <div class="date-range">
+                <div class="date-input">
+                    <label>From:</label>
+                    <input type="date" id="startDate" min="2022-11-23">
+                </div>
+                <div class="date-input">
+                    <label>To:</label>
+                    <input type="date" id="endDate">
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button id="loadData" class="primary">Load Data</button>
+                <button id="refreshBtn">Refresh</button>
+                <button id="shipLookup">Ship Lookup</button>
+                <button id="analyzeItems">Analyze Items</button>
+                <button id="exportData">Export</button>
+                <button id="helpBtn">Help</button>
             </div>
         </div>
-    </main>
 
-    <script src="js/app.js" type="module"></script>
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="progress-container">
+                <div id="progressBar" class="progress"></div>
+            </div>
+            <span id="statusText">Ready to load data</span>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="content">
+            <div class="data-display">
+                <pre id="dataOutput"></pre>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal">
+            <div class="modal-content">
+                <h2>Display Settings</h2>
+                <div class="setting-group">
+                    <label for="fontSize">Text Size:</label>
+                    <input type="number" id="fontSize" min="8" max="24" value="12">
+                </div>
+                <div class="setting-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="wrapText">
+                        <span class="checkmark"></span>
+                        Wrap Text
+                    </label>
+                </div>
+                <div class="modal-buttons">
+                    <button id="closeSettings">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Modal -->
+        <div id="helpModal" class="modal">
+            <div class="modal-content">
+                <h2>Help</h2>
+                <div class="help-navigation">
+                    <button data-section="introduction">Introduction</button>
+                    <button data-section="loading">Loading Data</button>
+                    <button data-section="filtering">Filtering</button>
+                    <button data-section="shipLookup">Ship Lookup</button>
+                    <button data-section="analysis">Analysis</button>
+                </div>
+                <div class="help-content"></div>
+                <div class="modal-buttons">
+                    <button id="closeHelp">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/app.js"></script>
 </body>
 </html>
