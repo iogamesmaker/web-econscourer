@@ -3,43 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Drednot.io Economic Data Tracker</title>
+    <title>Drednot.io Economic Data Explorer</title>
     <link rel="stylesheet" href="css/style.css">
-    <!-- Add Chart.js for visualizations -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Add Lunr.js for search functionality -->
-    <script src="https://unpkg.com/lunr/lunr.js"></script>
 </head>
 <body>
     <header>
-        <h1>Drednot.io Economic Data Tracker</h1>
-        <div class="search-container">
-            <input type="text" id="search" placeholder="Search items, ships, or activities...">
+        <h1>Drednot.io Economic Data Explorer</h1>
+        <div id="date-controls">
+            <button id="prev-day">←</button>
+            <input type="date" id="date-picker" min="2022-11-23">
+            <button id="next-day">→</button>
+            <button id="go-to-latest">Latest</button>
         </div>
     </header>
 
     <main>
-        <section id="summary">
-            <h2>Today's Summary</h2>
-            <div id="summary-stats"></div>
-        </section>
+        <div id="loading" class="hidden">Loading data...</div>
 
-        <section id="visualizations">
-            <h2>Economic Visualizations</h2>
-            <div class="chart-container">
-                <canvas id="itemDistributionChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <canvas id="activityChart"></canvas>
-            </div>
-        </section>
+        <div id="data-tabs">
+            <button class="tab-button active" data-tab="summary">Summary</button>
+            <button class="tab-button" data-tab="ships">Ships</button>
+            <button class="tab-button" data-tab="log">Log</button>
+        </div>
 
-        <section id="data">
-            <h2>Raw Data</h2>
-            <div id="data-container"></div>
-        </section>
+        <div id="data-view">
+            <div id="summary-view" class="tab-content active">
+                <div id="summary-data"></div>
+            </div>
+
+            <div id="ships-view" class="tab-content">
+                <div id="ships-controls">
+                    <input type="text" id="ships-search" placeholder="Search ships...">
+                    <select id="ships-sort">
+                        <option value="name">Sort by Name</option>
+                        <option value="price">Sort by Price</option>
+                        <option value="type">Sort by Type</option>
+                    </select>
+                </div>
+                <div id="ships-data"></div>
+                <div id="ships-pagination"></div>
+            </div>
+
+            <div id="log-view" class="tab-content">
+                <div id="log-controls">
+                    <input type="text" id="log-search" placeholder="Search log entries...">
+                    <select id="log-type-filter">
+                        <option value="all">All Types</option>
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                <div id="log-data"></div>
+                <div id="log-pagination"></div>
+            </div>
+        </div>
     </main>
 
-    <script src="js/app.js"></script>
+    <script src="js/app.js" type="module"></script>
 </body>
 </html>

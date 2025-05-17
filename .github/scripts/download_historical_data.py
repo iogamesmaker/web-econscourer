@@ -73,7 +73,7 @@ def download_historical_data():
     current_date = start_date
     while current_date <= end_date:
         dates.append(format_date(current_date))
-        current_date += timedelta(days=1)
+        current_date +=     (days=1)
 
     print(f"Downloading historical data from {format_date(start_date)} to {format_date(end_date)}")
     print(f"Total days to process: {len(dates)}")
