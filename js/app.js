@@ -10,12 +10,30 @@ import {
                 formatEntity
 } from './utils.js';
 
+import {
+    loadSettings,
+    saveSettings,
+    applySettings,
+    setupSettingsHandlers,
+    setupHelpSystem,
+    updateSettings
+} from './settings.js';
+
 // Initialize on load
 document.addEventListener('DOMContentLoaded', () => {
+    // Load and apply settings
+    STATE.settings = loadSettings();
+    applySettings(STATE.settings);
+
+    // Setup UI and handlers
     initializeUI();
-    loadSettings();
     setupEventListeners();
+    setupSettingsHandlers();
+    setupHelpSystem();
     setInitialDates();
+
+    // Show initial timestamp
+    updateTimestamp();
 });
 
 function initializeUI() {
@@ -196,6 +214,12 @@ function validateDateRange(startDate, endDate) {
     }
 
     return true;
+}
+
+function updateTimestamp() {
+    const now = new Date();
+    const timestamp = now.toISOString().replace('T', ' ').substr(0, 19) + ' UTC';
+    document.getElementById('lastUpdate').textContent = `Last Update: ${timestamp}`;
 }
 
 function getDatesInRange(start, end) {
