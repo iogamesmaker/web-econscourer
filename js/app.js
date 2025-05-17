@@ -10,20 +10,6 @@ import {
                 formatEntity
 } from './utils.js';
 
-const STATE = {
-    rawData: [],
-    filteredData: [],
-    shipNames: {},
-    settings: {
-        fontSize: 12,
-        wrapText: false,
-        showBots: false,
-        useShipNames: false
-    },
-    downloading: false,
-    shipLoadingInProgress: false
-};
-
 // Initialize on load
 document.addEventListener('DOMContentLoaded', () => {
     initializeUI();
