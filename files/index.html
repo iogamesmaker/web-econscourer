@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drednot.io Economic Data Tracker</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Add Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Add Lunr.js for search functionality -->
+    <script src="https://unpkg.com/lunr/lunr.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Drednot.io Economic Data Tracker</h1>
+        <div class="search-container">
+            <input type="text" id="search" placeholder="Search items, ships, or activities...">
+        </div>
+    </header>
+
+    <main>
+        <section id="summary">
+            <h2>Today's Summary</h2>
+            <div id="summary-stats"></div>
+        </section>
+
+        <section id="visualizations">
+            <h2>Economic Visualizations</h2>
+            <div class="chart-container">
+                <canvas id="itemDistributionChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="activityChart"></canvas>
+            </div>
+        </section>
+
+        <section id="data">
+            <h2>Raw Data</h2>
+            <div id="data-container"></div>
+        </section>
+    </main>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
