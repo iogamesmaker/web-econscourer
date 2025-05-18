@@ -1,4 +1,7 @@
 // Import modules
+const CORS_PROXY = 'https://corsproxy.io/';
+const DREDNOT_API = 'https://iogamesmaker.github.io/web-econscourer/data/';
+
 import { STATE } from './state.js';
 import { ITEM_DB } from './constants.js';
 import {
@@ -96,6 +99,7 @@ function setInitialDates() {
     startDate.value = minDate;
     endDate.value = today;
 }
+// Add retry logic to loadData
 
 async function loadData() {
     if (STATE.downloading) {
@@ -117,19 +121,53 @@ async function loadData() {
         const dates = getDatesInRange(startDate, endDate);
         const totalDates = dates.length;
         let processedDates = 0;
+        let errorCount = 0;
 
         STATE.rawData = [];
 
+        const maxRetries = 3; // Maximum number of retries per date
+
         for (const date of dates) {
             const dateStr = formatDate(date);
-            await loadDateData(dateStr);
+            let retries = 0;
+            let success = false;
+
+            while (retries < maxRetries && !success) {
+                try {
+                    await loadDateData(dateStr);
+                    success = true;
+                } catch (error) {
+                    retries++;
+                    if (retries === maxRetries) {
+                        errorCount++;
+                        console.error(`Failed to load ${dateStr} after ${maxRetries} attempts:`, error);
+                    } else {
+                        console.log(`Retrying ${dateStr} (attempt ${retries + 1}/${maxRetries})`);
+                        await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // Exponential backoff
+                    }
+                }
+            }
 
             processedDates++;
-            updateStatus(`Processing ${dateStr} (${processedDates}/${totalDates})`, (processedDates / totalDates) * 100);
+            updateStatus(
+                `Processing ${dateStr} (${processedDates}/${totalDates}) - ${errorCount} errors`,
+                         (processedDates / totalDates) * 100
+            );
         }
 
-        updateStatus(`Loaded ${STATE.rawData.length} transactions`, 100);
-        showNotice(`Successfully loaded ${STATE.rawData.length} transactions`, 'success');
+        if (STATE.rawData.length > 0) {
+            updateStatus(
+                `Loaded ${STATE.rawData.length} transactions (${errorCount} errors)`,
+                         100
+            );
+            showNotice(
+                `Successfully loaded ${STATE.rawData.length} transactions` +
+                (errorCount ? ` (${errorCount} dates failed)` : ''),
+                       errorCount ? 'warning' : 'success'
+            );
+        } else {
+            throw new Error('No data was loaded successfully');
+        }
 
         STATE.filteredData = STATE.rawData;
         updateDisplay();
@@ -145,10 +183,15 @@ async function loadData() {
 
 async function loadDateData(dateStr) {
     try {
-        const baseUrl = `https://iogamesplayer.com/web-econscourer/data/${dateStr}`;
+        // Construct URLs properly
+        const baseUrl = `${DREDNOT_API}/${dateStr}`;
+        const logUrl = `${baseUrl}/log.json.gz`;
+        const proxiedUrl = `${CORS_PROXY}?${encodeURIComponent(logUrl)}`;
 
         // Load log data
-        const logResponse = await fetch(`${baseUrl}/log.json.gz`);
+        console.log(`Fetching: ${proxiedUrl}`); // Debug log
+        const logResponse = await fetch(proxiedUrl);
+
         if (!logResponse.ok) {
             if (logResponse.status === 404) {
                 console.log(`No data available for ${dateStr}`);
@@ -180,6 +223,7 @@ async function loadDateData(dateStr) {
 
     } catch (error) {
         console.error(`Error loading data for ${dateStr}:`, error);
+        throw error; // Re-throw to be handled by the caller
     }
 }
 
@@ -381,9 +425,16 @@ async function loadShipNames() {
     }
 }
 
+// Update loadShipData similarly
 async function loadShipData(dateStr) {
     try {
-        const response = await fetch(`https://iogamesplayer.com/web-econscourer/data/${dateStr}/ships.json.gz`);
+        const baseUrl = `${DREDNOT_API}/${dateStr}`;
+        const shipsUrl = `${baseUrl}/ships.json.gz`;
+        const proxiedUrl = `${CORS_PROXY}?${encodeURIComponent(shipsUrl)}`;
+
+        console.log(`Fetching ships: ${proxiedUrl}`); // Debug log
+        const response = await fetch(proxiedUrl);
+
         if (!response.ok) {
             if (response.status === 404) return;
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -412,5 +463,7 @@ async function loadShipData(dateStr) {
 
     } catch (error) {
         console.error(`Error loading ship data for ${dateStr}:`, error);
+        throw error;
     }
 }
+
