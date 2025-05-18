@@ -1,5 +1,8 @@
 // settings.js - Settings and help functionality
 
+import { STATE } from './state.js';
+import { showNotice } from './utils.js';
+
 export const HELP_CONTENT = {
     introduction: `DREDNOT ECON LOG SCOURER
 
@@ -106,11 +109,10 @@ const DEFAULT_SETTINGS = {
 };
 
 // Update settings whenever changed
-function updateSettings(changes) {
+export function updateSettings(changes) {
     STATE.settings = { ...STATE.settings, ...changes };
     applySettings(STATE.settings);
     saveSettings(STATE.settings);
-    updateDisplay();
 }
 
 // Load settings from localStorage

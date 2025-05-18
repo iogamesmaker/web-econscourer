@@ -5,11 +5,10 @@ import {
     updateStatus,
     showNotice,
     formatDate,
-        formatTimestamp,
-            formatZone,
-                formatEntity
+    formatTimestamp,
+    formatZone,
+    formatEntity
 } from './utils.js';
-
 import {
     loadSettings,
     saveSettings,
