@@ -202,7 +202,7 @@ async function loadData() {
 
 async function loadDateData(dateStr) {
     try {
-        const proxiedUrl = buildProxiedUrl(dateStr, 'log');
+        const proxiedUrl = buildUrl(dateStr, 'log');
 
         // Load log data
         console.log(`Fetching data for ${dateStr}`);
@@ -489,7 +489,7 @@ async function loadShipNames() {
 
 async function loadShipData(dateStr) {
     try {
-        const proxiedUrl = buildProxiedUrl(dateStr, 'ships');
+        const proxiedUrl = buildUrl(dateStr, 'ships');
 
         console.log(`Fetching ships for ${dateStr}`);
         const response = await fetch(proxiedUrl);
