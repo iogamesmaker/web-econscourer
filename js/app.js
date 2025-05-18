@@ -16,10 +16,9 @@ import { STATE } from './state.js';
 import { ITEM_DB } from './constants.js';
 import {
     showNotice,
-    formatDate,
-        formatTimestamp,
-            formatZone,
-                formatEntity
+    formatTimestamp,
+    formatZone,
+    formatEntity
 } from './utils.js';
 import {
     loadSettings,
