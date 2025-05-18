@@ -109,6 +109,14 @@ function setInitialDates() {
 }
 // Add retry logic to loadData
 
+function formatDate(date) {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}_${month}_${day}`;
+}
+
 async function loadData() {
     if (STATE.downloading) {
         showNotice('Data is already being loaded', 'warning');
