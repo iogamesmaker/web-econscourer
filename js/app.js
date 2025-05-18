@@ -1,14 +1,18 @@
 // Import modules
-const CORS_PROXY = 'https://corsproxy.io/?';
 const DREDNOT_API = 'https://iogamesmaker.github.io/web-econscourer/data/';
+function removeDateLeadingZeros(dateStr) {
+    // Convert YYYY-MM-DD to YYYY_M_D format without leading zeros
+    const [year, month, day] = dateStr.split('-');
+    return `${year}_${parseInt(month)}_${parseInt(day)}`;
+}
+function buildUrl(dateStr, fileType) {
+    // Convert the date format and remove leading zeros
+    const formattedDate = removeDateLeadingZeros(dateStr);
 
-// Helper function for URL construction
-function buildProxiedUrl(dateStr, fileType) {
     // Remove any double slashes and ensure proper URL construction
-    const baseUrl = `${DREDNOT_API}/${dateStr}/${fileType}.json.gz`.replace(/([^:]\/)\/+/g, "$1");
-    // Use single encodeURIComponent instead of multiple encoding
-    const proxiedUrl = `${CORS_PROXY}${baseUrl}`;
-    return proxiedUrl;
+    const url = `${DREDNOT_API}/${formattedDate}/${fileType}.json.gz`.replace(/([^:]\/)\/+/g, "$1");
+    console.log('URL:', url); // Debug log
+    return url;
 }
 
 import { STATE } from './state.js';
