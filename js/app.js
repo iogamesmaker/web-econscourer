@@ -145,7 +145,7 @@ async function loadData() {
 
 async function loadDateData(dateStr) {
     try {
-        const baseUrl = `https://pub.drednot.io/prod/econ/${dateStr}`;
+        const baseUrl = `https://iogamesmaker.github.io/web-econscourer/data/${dateStr}`;
 
         // Load log data
         const logResponse = await fetch(`${baseUrl}/log.json.gz`);
@@ -383,7 +383,7 @@ async function loadShipNames() {
 
 async function loadShipData(dateStr) {
     try {
-        const response = await fetch(`https://pub.drednot.io/prod/econ/${dateStr}/ships.json.gz`);
+        const response = await fetch(`https://iogamesmaker.github.io/web-econscourer/data/${dateStr}/ships.json.gz`);
         if (!response.ok) {
             if (response.status === 404) return;
             throw new Error(`HTTP error! status: ${response.status}`);
