@@ -43,7 +43,7 @@ export function parseApiDate(dateStr) {
     return new Date(Date.UTC(year, month - 1, day));
 }
 
-export function formatDate(date) {
+function formatDate(date) {
     return `${date.getUTCFullYear()}_${date.getUTCMonth() + 1}_${date.getUTCDate()}`;
 }
 
