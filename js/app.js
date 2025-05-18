@@ -15,7 +15,6 @@ function buildProxiedUrl(dateStr, fileType) {
 import { STATE } from './state.js';
 import { ITEM_DB } from './constants.js';
 import {
-    updateStatus,
     showNotice,
     formatDate,
     formatTimestamp,
