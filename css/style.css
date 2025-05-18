@@ -353,6 +353,39 @@ padding: 1rem;
     border-radius: 4px;
 }
 
+.settings-group {
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.settings-group label {
+    min-width: 120px;
+}
+
+.settings-group input[type="number"] {
+    width: 60px;
+    padding: 4px;
+}
+
+#userInfo {
+margin-left: 1rem;
+opacity: 0.8;
+}
+
+/* Dark mode adjustments */
+.dark-mode #settingsModal .modal-content {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+}
+
+.dark-mode input[type="number"] {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
 .error {
     background-color: var(--error-color);
     color: white;

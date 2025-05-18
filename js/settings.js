@@ -1,7 +1,7 @@
 // settings.js - Settings and help functionality
 
 import { STATE } from './state.js';
-import { showNotice } from './utils.js';
+import { showNotice, updateTimestamp } from './utils.js';
 
 export const HELP_CONTENT = {
     introduction: `DREDNOT ECON LOG SCOURER
@@ -138,57 +138,93 @@ export function saveSettings(settings) {
     }
 }
 
-// Apply settings to UI
 export function applySettings(settings) {
-    // Font size
+    // Apply font size
     document.getElementById('dataOutput').style.fontSize = `${settings.fontSize}px`;
 
-    // Text wrap
+    // Apply text wrap
     document.getElementById('dataOutput').style.whiteSpace = settings.wrapText ? 'pre-wrap' : 'pre';
 
-    // Show bots checkbox
-    document.getElementById('showBots').checked = settings.showBots;
-
-    // Use ship names checkbox
-    document.getElementById('useShipNames').checked = settings.useShipNames;
-
-    // Dark mode
+    // Apply dark mode
     document.documentElement.classList.toggle('dark-mode', settings.darkMode);
+
+    // Update timestamp if needed
+    if (settings.showTimestamps) {
+        updateTimestamp();
+    }
 }
 
-// Handle settings changes
+// Setup settings handlers
 export function setupSettingsHandlers() {
-    const settingsBtn = document.getElementById('settingsBtn');
-    const settingsModal = document.getElementById('settingsModal');
-    const closeSettings = document.getElementById('closeSettings');
-    const fontSize = document.getElementById('fontSize');
-    const wrapText = document.getElementById('wrapText');
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeSettings);
+    } else {
+        initializeSettings();
+    }
+}
 
-    settingsBtn.addEventListener('click', () => {
-        settingsModal.classList.add('show');
+function updateSettingsUI(elements) {
+    elements.fontSize.value = STATE.settings.fontSize;
+    elements.wrapText.checked = STATE.settings.wrapText;
+    elements.darkMode.checked = STATE.settings.darkMode;
+    elements.showTimestamps.checked = STATE.settings.showTimestamps;
+}
+
+function initializeSettings() {
+    const elements = {
+        settingsBtn: document.getElementById('settingsBtn'),
+        settingsModal: document.getElementById('settingsModal'),
+        closeSettings: document.getElementById('closeSettings'),
+        fontSize: document.getElementById('fontSize'),
+        wrapText: document.getElementById('wrapText'),
+        darkMode: document.getElementById('darkMode'),
+        showTimestamps: document.getElementById('showTimestamps')
+    };
+
+    // Verify all elements exist
+    for (const [key, element] of Object.entries(elements)) {
+        if (!element) {
+            console.error(`Missing element: ${key}`);
+            return;
+        }
+    }
+
+    // Setup modal controls
+    elements.settingsBtn.addEventListener('click', () => {
+        elements.settingsModal.classList.add('show');
+        updateSettingsUI(elements);
     });
 
-    closeSettings.addEventListener('click', () => {
-        settingsModal.classList.remove('show');
+    elements.closeSettings.addEventListener('click', () => {
+        elements.settingsModal.classList.remove('show');
     });
 
-    fontSize.addEventListener('change', () => {
-        const size = parseInt(fontSize.value);
+    // Setup settings controls
+    elements.fontSize.addEventListener('change', () => {
+        const size = parseInt(elements.fontSize.value);
         if (size >= 8 && size <= 24) {
-            STATE.settings.fontSize = size;
-            applySettings(STATE.settings);
-            saveSettings(STATE.settings);
+            updateSettings({ fontSize: size });
         } else {
             showNotice('Font size must be between 8 and 24', 'error');
-            fontSize.value = STATE.settings.fontSize;
+            elements.fontSize.value = STATE.settings.fontSize;
         }
     });
 
-    wrapText.addEventListener('change', () => {
-        STATE.settings.wrapText = wrapText.checked;
-        applySettings(STATE.settings);
-        saveSettings(STATE.settings);
+    elements.wrapText.addEventListener('change', () => {
+        updateSettings({ wrapText: elements.wrapText.checked });
     });
+
+    elements.darkMode.addEventListener('change', () => {
+        updateSettings({ darkMode: elements.darkMode.checked });
+    });
+
+    elements.showTimestamps.addEventListener('change', () => {
+        updateSettings({ showTimestamps: elements.showTimestamps.checked });
+    });
+
+    // Initial settings application
+    applySettings(STATE.settings);
 }
 
 // Help system

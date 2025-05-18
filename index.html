@@ -3,24 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Drednot Economy Data</title>
+    <title>Drednot Economy Data Viewer</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Drednot Economy Data Viewer</h1>
-            <div class="date-info">
-                <span id="lastUpdate">Last Update: Loading...</span>
+            <div class="header-main">
+                <h1>Drednot Economy Data Viewer</h1>
+                <div class="header-info">
+                    <div class="timestamp">
+                        <span id="lastUpdate">Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): Loading...</span>
+                    </div>
+                    <div class="user-info">
+                        <span id="userInfo">Current User's Login: Loading...</span>
+                    </div>
+                </div>
             </div>
         </header>
 
         <div class="controls">
+            <!-- Date Range -->
+            <div class="date-range">
+                <div class="range-group">
+                    <div class="date-input">
+                        <label>From:</label>
+                        <input type="date" id="startDate" min="2022-11-23">
+                    </div>
+                    <button id="setSameDate">Set To = From</button>
+                    <div class="date-input">
+                        <label>To:</label>
+                        <input type="date" id="endDate">
+                    </div>
+                </div>
+                <div class="action-row">
+                    <button id="loadData" class="primary">Load Data</button>
+                    <button id="cancelLoad" disabled>Cancel</button>
+                </div>
+            </div>
+
             <!-- Item Filter Section -->
             <div class="filter-section">
                 <label for="itemFilter">Item Filter:</label>
                 <div class="search-container">
-                    <input type="text" id="itemFilter" placeholder="Search items...">
+                    <input type="text" id="itemFilter" placeholder="Search items... (press Enter to show dropdown)">
                     <div id="itemSuggestions" class="suggestions"></div>
                 </div>
             </div>
@@ -51,25 +77,13 @@
                 </label>
             </div>
 
-            <!-- Date Range -->
-            <div class="date-range">
-                <div class="date-input">
-                    <label>From:</label>
-                    <input type="date" id="startDate" min="2022-11-23">
-                </div>
-                <div class="date-input">
-                    <label>To:</label>
-                    <input type="date" id="endDate">
-                </div>
-            </div>
-
             <!-- Action Buttons -->
             <div class="action-buttons">
-                <button id="loadData" class="primary">Load Data</button>
                 <button id="refreshBtn">Refresh</button>
                 <button id="shipLookup">Ship Lookup</button>
                 <button id="analyzeItems">Analyze Items</button>
                 <button id="exportData">Export</button>
+                <button id="settingsBtn" title="Settings">⚙</button>
                 <button id="helpBtn">Help</button>
             </div>
         </div>
@@ -85,7 +99,7 @@
         <!-- Main Content Area -->
         <div class="content">
             <div class="data-display">
-                <pre id="dataOutput"></pre>
+                <pre id="dataOutput">Select a date range and click "Load Data" to begin.</pre>
             </div>
         </div>
 
@@ -93,18 +107,43 @@
         <div id="settingsModal" class="modal">
             <div class="modal-content">
                 <h2>Display Settings</h2>
-                <div class="setting-group">
+                <div class="settings-group">
                     <label for="fontSize">Text Size:</label>
                     <input type="number" id="fontSize" min="8" max="24" value="12">
+                    <span class="size-info">px</span>
                 </div>
-                <div class="setting-group">
+                <div class="settings-group">
                     <label class="checkbox-container">
                         <input type="checkbox" id="wrapText">
                         <span class="checkmark"></span>
                         Wrap Text
                     </label>
                 </div>
+                <div class="settings-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="darkMode">
+                        <span class="checkmark"></span>
+                        Dark Mode
+                    </label>
+                </div>
+                <div class="settings-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="showTimestamps" checked>
+                        <span class="checkmark"></span>
+                        Show Timestamps
+                    </label>
+                </div>
+                <div class="settings-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="alternateRows" checked>
+                        <span class="checkmark"></span>
+                        Alternate Row Colors
+                    </label>
+                </div>
                 <div class="modal-buttons">
+                    <button id="exportSettings">Export Settings</button>
+                    <button id="importSettings">Import Settings</button>
+                    <button id="resetSettings">Reset to Default</button>
                     <button id="closeSettings">Close</button>
                 </div>
             </div>
@@ -115,19 +154,109 @@
             <div class="modal-content">
                 <h2>Help</h2>
                 <div class="help-navigation">
-                    <button data-section="introduction">Introduction</button>
+                    <button data-section="introduction" class="active">Introduction</button>
                     <button data-section="loading">Loading Data</button>
                     <button data-section="filtering">Filtering</button>
                     <button data-section="shipLookup">Ship Lookup</button>
                     <button data-section="analysis">Analysis</button>
                 </div>
-                <div class="help-content"></div>
+                <div class="help-content">
+                    <pre>Select a help section from above to view information.</pre>
+                </div>
                 <div class="modal-buttons">
                     <button id="closeHelp">Close</button>
                 </div>
             </div>
         </div>
+
+        <!-- Ship Lookup Modal -->
+        <div id="shipLookupModal" class="modal">
+            <div class="modal-content">
+                <h2>Ship Lookup</h2>
+                <div class="lookup-controls">
+                    <div class="search-type">
+                        <label class="radio-container">
+                            <input type="radio" name="searchType" value="id" checked>
+                            <span class="radio"></span>
+                            Search by ID
+                        </label>
+                        <label class="radio-container">
+                            <input type="radio" name="searchType" value="name">
+                            <span class="radio"></span>
+                            Search by Name
+                        </label>
+                    </div>
+                    <div class="search-options">
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="caseSensitive">
+                            <span class="checkmark"></span>
+                            Case Sensitive
+                        </label>
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="enableSearch" checked>
+                            <span class="checkmark"></span>
+                            Enable Searching
+                        </label>
+                    </div>
+                    <div class="search-input">
+                        <input type="text" id="shipSearch" placeholder="Enter ship ID or name...">
+                        <button id="searchBack" disabled>←</button>
+                    </div>
+                </div>
+                <div class="results-container">
+                    <div class="matches-list">
+                        <select id="shipMatches" size="10"></select>
+                    </div>
+                    <div class="ship-details">
+                        <pre id="shipDetails">Enter a search term to find ships.</pre>
+                    </div>
+                </div>
+                <div class="modal-buttons">
+                    <button id="closeShipLookup">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analysis Modal -->
+        <div id="analysisModal" class="modal">
+            <div class="modal-content">
+                <h2>Item Analysis</h2>
+                <div class="date-selector">
+                    <label>Analysis Date:</label>
+                    <input type="date" id="analysisDate" min="2022-11-23">
+                    <button id="analyzeAll">Analyze All Dates</button>
+                </div>
+                <div class="analysis-results">
+                    <div class="results-header">
+                        <input type="text" id="analysisFilter" placeholder="Filter items...">
+                        <select id="sortBy">
+                            <option value="count-desc">Count (High to Low)</option>
+                            <option value="count-asc">Count (Low to High)</option>
+                            <option value="name-asc">Name (A to Z)</option>
+                            <option value="name-desc">Name (Z to A)</option>
+                            <option value="id">Item ID</option>
+                        </select>
+                    </div>
+                    <div class="results-list">
+                        <table id="analysisTable">
+                            <thead>
+                                <tr>
+                                    <th>Item ID</th>
+                                    <th>Item Name</th>
+                                    <th>Count</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-buttons">
+                    <button id="exportAnalysis">Export Results</button>
+                    <button id="closeAnalysis">Close</button>
+                </div>
+            </div>
+        </div>
     </div>
-<script src="js/app.js" type="module"></script>
+    <script src="js/app.js" type="module"></script>
 </body>
 </html>
