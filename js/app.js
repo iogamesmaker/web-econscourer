@@ -1,6 +1,16 @@
 // Import modules
-const CORS_PROXY = 'https://corsproxy.io/';
+const CORS_PROXY = 'https://corsproxy.io/?';
 const DREDNOT_API = 'https://iogamesmaker.github.io/web-econscourer/data/';
+
+// Helper function for URL construction
+function buildProxiedUrl(dateStr, fileType) {
+    // Remove any double slashes and ensure proper URL construction
+    const baseUrl = `${DREDNOT_API}/${dateStr}/${fileType}.json.gz`.replace(/([^:]\/)\/+/g, "$1");
+    console.log('Original URL:', baseUrl); // Debug log
+    const proxiedUrl = `${CORS_PROXY}${encodeURIComponent(baseUrl)}`;
+    console.log('Proxied URL:', proxiedUrl); // Debug log
+    return proxiedUrl;
+}
 
 import { STATE } from './state.js';
 import { ITEM_DB } from './constants.js';
@@ -183,13 +193,10 @@ async function loadData() {
 
 async function loadDateData(dateStr) {
     try {
-        // Construct URLs properly
-        const baseUrl = `${DREDNOT_API}/${dateStr}`;
-        const logUrl = `${baseUrl}/log.json.gz`;
-        const proxiedUrl = `${CORS_PROXY}?${encodeURIComponent(logUrl)}`;
+        const proxiedUrl = buildProxiedUrl(dateStr, 'log');
 
         // Load log data
-        console.log(`Fetching: ${proxiedUrl}`); // Debug log
+        console.log(`Fetching data for ${dateStr}`);
         const logResponse = await fetch(proxiedUrl);
 
         if (!logResponse.ok) {
@@ -223,7 +230,7 @@ async function loadDateData(dateStr) {
 
     } catch (error) {
         console.error(`Error loading data for ${dateStr}:`, error);
-        throw error; // Re-throw to be handled by the caller
+        throw error;
     }
 }
 
@@ -234,26 +241,39 @@ async function decompressGzip(buffer) {
     return new TextDecoder().decode(decompressedBuffer);
 }
 
+// Add validation for dates
 function validateDateRange(startDate, endDate) {
     const minDate = new Date('2022-11-23');
     const maxDate = new Date();
+    maxDate.setHours(23, 59, 59, 999); // End of current day
 
-    if (startDate < minDate || endDate < minDate) {
-        showNotice('The earliest possible date is 2022-11-23', 'error');
+    console.log('Date validation:', {
+        start: startDate,
+        end: endDate,
+        min: minDate,
+        max: maxDate
+    });
+
+    if (startDate < minDate) {
+        showNotice('Start date cannot be before 2022-11-23', 'error');
         return false;
     }
 
-    if (startDate > maxDate || endDate > maxDate) {
-        showNotice('Cannot select future dates', 'error');
+    if (endDate > maxDate) {
+        showNotice('End date cannot be in the future', 'error');
         return false;
     }
 
     if (startDate > endDate) {
-        // Swap dates
-        const temp = document.getElementById('startDate').value;
-        document.getElementById('startDate').value = document.getElementById('endDate').value;
-        document.getElementById('endDate').value = temp;
-        return true;
+        showNotice('Start date must be before or equal to end date', 'error');
+        return false;
+    }
+
+    // Check if date range is too large
+    const dayDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    if (dayDiff > 60) {
+        showNotice('Date range cannot exceed 60 days to prevent memory issues', 'error');
+        return false;
     }
 
     return true;
@@ -359,6 +379,39 @@ function formatTransactions(transactions) {
     return output.join('\n');
 }
 
+// Update the progress display
+function updateStatus(message, progress, details = '') {
+    const statusText = document.getElementById('statusText');
+    const progressBar = document.getElementById('progressBar');
+
+    statusText.textContent = message + (details ? ` (${details})` : '');
+    progressBar.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+}
+
+// Add loading indicator
+function toggleLoadingState(isLoading) {
+    const loadButton = document.getElementById('loadData');
+    const cancelButton = document.getElementById('cancelLoad');
+
+    loadButton.disabled = isLoading;
+    cancelButton.disabled = !isLoading;
+    STATE.downloading = isLoading;
+
+    if (!isLoading) {
+        cancelButton.textContent = 'Cancel';
+    }
+}
+
+// Add cancellation support
+let abortController = null;
+
+document.getElementById('cancelLoad').addEventListener('click', () => {
+    if (abortController) {
+        abortController.abort();
+        abortController = null;
+    }
+});
+
 // Event Listeners
 function setupEventListeners() {
     document.getElementById('loadData').addEventListener('click', loadData);
@@ -425,19 +478,19 @@ async function loadShipNames() {
     }
 }
 
-// Update loadShipData similarly
 async function loadShipData(dateStr) {
     try {
-        const baseUrl = `${DREDNOT_API}/${dateStr}`;
-        const shipsUrl = `${baseUrl}/ships.json.gz`;
-        const proxiedUrl = `${CORS_PROXY}?${encodeURIComponent(shipsUrl)}`;
+        const proxiedUrl = buildProxiedUrl(dateStr, 'ships');
 
-        console.log(`Fetching ships: ${proxiedUrl}`); // Debug log
+        console.log(`Fetching ships for ${dateStr}`);
         const response = await fetch(proxiedUrl);
 
-        if (!response.ok) {
-            if (response.status === 404) return;
-            throw new Error(`HTTP error! status: ${response.status}`);
+        if (!logResponse.ok) {
+            if (logResponse.status === 404) {
+                console.log(`No ship data available for ${dateStr}`);
+                return;
+            }
+            throw new Error(`HTTP error! status: ${logResponse.status}`);
         }
 
         const buffer = await response.arrayBuffer();
