@@ -6,9 +6,8 @@ const DREDNOT_API = 'https://iogamesmaker.github.io/web-econscourer/data/';
 function buildProxiedUrl(dateStr, fileType) {
     // Remove any double slashes and ensure proper URL construction
     const baseUrl = `${DREDNOT_API}/${dateStr}/${fileType}.json.gz`.replace(/([^:]\/)\/+/g, "$1");
-    console.log('Original URL:', baseUrl); // Debug log
-    const proxiedUrl = `${CORS_PROXY}${encodeURIComponent(baseUrl)}`;
-    console.log('Proxied URL:', proxiedUrl); // Debug log
+    // Use single encodeURIComponent instead of multiple encoding
+    const proxiedUrl = `${CORS_PROXY}${baseUrl}`;
     return proxiedUrl;
 }
 
