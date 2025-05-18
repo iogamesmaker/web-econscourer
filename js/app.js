@@ -1,10 +1,12 @@
 // Import modules
-const DREDNOT_API = 'https://iogamesmaker.github.io/web-econscourer/data/';
+const DREDNOT_API = 'https://raw.githubusercontent.com/iogamesmaker/web-econscourer/main/data/';
+
 function removeDateLeadingZeros(dateStr) {
     // Convert YYYY-MM-DD to YYYY_M_D format without leading zeros
-    const [year, month, day] = dateStr.split('-');
-    return `${year}_${parseInt(month)}_${parseInt(day)}`;
+    const [year, month, day] = dateStr.split('-').map(x => parseInt(x, 10));
+    return `${year}_${month}_${day}`;  // No need for parseInt here since we already did it in map()
 }
+
 function buildUrl(dateStr, fileType) {
     // Convert the date format and remove leading zeros
     const formattedDate = removeDateLeadingZeros(dateStr);
@@ -115,8 +117,8 @@ function setInitialDates() {
 function formatDate(date) {
     const d = new Date(date);
     const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const month = d.getMonth() + 1;  // Remove padStart, we want numbers without leading zeros
+    const day = d.getDate();         // Remove padStart, we want numbers without leading zeros
     return `${year}_${month}_${day}`;
 }
 
