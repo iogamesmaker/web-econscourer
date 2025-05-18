@@ -12,14 +12,6 @@ export function getUTCDateComponents(date) {
     };
 }
 
-export function updateStatus(message, progress) {
-    const statusText = document.getElementById('statusText');
-    const progressBar = document.getElementById('progressBar');
-
-    statusText.textContent = message;
-    progressBar.style.width = `${progress}%`;
-}
-
 export function getDateComponents(date) {
     return {
         year: date.getUTCFullYear(),
