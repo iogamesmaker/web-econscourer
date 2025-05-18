@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Econscourer</title>
     <style>
         body {
             font-family: monospace;
             margin: 20px;
-            background: #1b1b1b;
-            color: #e0e0e0;
+            background: #1e1e1e;
+            color: #d4d4d4;
         }
 
         .container {
@@ -16,70 +17,31 @@
             margin: 0 auto;
         }
 
-        .filters {
+        .controls {
             margin-bottom: 20px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 10px;
-        }
-
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .date-range {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        input[type="date"], input[type="text"] {
+            padding: 15px;
             background: #2d2d2d;
-            border: 1px solid #444;
-            color: #e0e0e0;
-            padding: 5px;
-            border-radius: 4px;
-        }
-
-        button {
-            background: #444;
-            color: #e0e0e0;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: #555;
-        }
-
-        button:disabled {
-            background: #333;
-            cursor: not-allowed;
+            border-radius: 5px;
         }
 
         .search-container {
             position: relative;
+            display: inline-block;
         }
 
         #itemSuggestions {
+            display: none;
             position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: #2d2d2d;
-            border: 1px solid #444;
-            border-radius: 4px;
+            background: #333;
+            border: 1px solid #555;
             max-height: 200px;
             overflow-y: auto;
-            display: none;
+            width: 100%;
             z-index: 1000;
         }
 
         #itemSuggestions div {
-            padding: 5px;
+            padding: 5px 10px;
             cursor: pointer;
         }
 
@@ -87,76 +49,100 @@
             background: #444;
         }
 
+        input, select {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 5px;
+            margin: 5px;
+        }
+
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:disabled {
+            background: #444;
+            cursor: not-allowed;
+        }
+
+        button:hover:not(:disabled) {
+            background: #0077ee;
+        }
+
         .progress-container {
             width: 100%;
+            background: #333;
             height: 20px;
-            background: #2d2d2d;
+            margin: 10px 0;
             border-radius: 10px;
             overflow: hidden;
-            margin: 10px 0;
         }
 
         #progressBar {
             width: 0%;
             height: 100%;
-            background: #4CAF50;
+            background: #0066cc;
             transition: width 0.3s ease;
-        }
-
-        #statusText {
-            margin-top: 5px;
-            color: #888;
         }
 
         #dataOutput {
             background: #2d2d2d;
-            padding: 10px;
-            border-radius: 4px;
+            padding: 15px;
+            border-radius: 5px;
             white-space: pre-wrap;
-            font-family: monospace;
         }
 
         .even-row {
-            background: #333;
+            background: #2d2d2d;
         }
 
         .odd-row {
-            background: #2d2d2d;
+            background: #333333;
         }
 
         .notice {
             padding: 10px;
             margin: 10px 0;
-            border-radius: 4px;
-        }
-
-        .notice.success {
-            background: #1b4d1b;
-            color: #4CAF50;
-        }
-
-        .notice.warning {
-            background: #4d3d1b;
-            color: #ffc107;
+            border-radius: 5px;
         }
 
         .notice.error {
-            background: #4d1b1b;
-            color: #ff4444;
+            background: #662222;
+            color: #ffaaaa;
         }
 
-        #lastUpdate {
-            color: #888;
-            font-size: 0.9em;
-            margin-top: 10px;
+        .notice.warning {
+            background: #666622;
+            color: #ffffaa;
         }
 
-        .checkbox-group {
+        .notice.success {
+            background: #226622;
+            color: #aaffaa;
+        }
+
+        .help-text {
+            display: none;
+            background: #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+
+        .help-toggle {
+            cursor: help;
+            text-decoration: underline;
+            color: #0066cc;
+        }
+
+        .filter-group {
             margin: 10px 0;
-        }
-
-        .checkbox-group label {
-            margin-left: 5px;
         }
     </style>
 </head>
@@ -164,61 +150,61 @@
     <div class="container">
         <h1>Web Econscourer</h1>
 
-        <div class="filters">
+        <div class="controls">
             <div class="filter-group">
-                <label>Date Range:</label>
-                <div class="date-range">
-                    <input type="date" id="startDate" min="2022-11-23">
-                    <span>to</span>
-                    <input type="date" id="endDate">
-                </div>
+                <label for="startDate">Start Date:</label>
+                <input type="date" id="startDate">
+                <label for="endDate">End Date:</label>
+                <input type="date" id="endDate">
             </div>
 
             <div class="filter-group">
-                <label>Item:</label>
+                <label for="itemFilter">Item Filter:</label>
                 <div class="search-container">
-                    <input type="text" id="itemFilter" placeholder="Search items...">
+                    <input type="text" id="itemFilter" placeholder="Filter by item...">
                     <div id="itemSuggestions"></div>
                 </div>
-            </div>
 
-            <div class="filter-group">
-                <label>Source:</label>
+                <label for="sourceFilter">Source Filter:</label>
                 <input type="text" id="sourceFilter" placeholder="Filter by source...">
-            </div>
 
-            <div class="filter-group">
-                <label>Destination:</label>
+                <label for="destFilter">Destination Filter:</label>
                 <input type="text" id="destFilter" placeholder="Filter by destination...">
             </div>
-        </div>
 
-        <div class="checkbox-group">
-            <input type="checkbox" id="showBots" checked>
-            <label for="showBots">Show Bot Transactions</label>
-        </div>
+            <div class="filter-group">
+                <label>
+                    <input type="checkbox" id="showBots" checked>
+                    <span class="help-toggle" data-help="showBotsHelp">Show Bot Trades Only</span>
+                </label>
+                <div id="showBotsHelp" class="help-text">
+                    When checked, only shows trades between bot ships (those with hex codes).
+                </div>
 
-        <div class="checkbox-group">
-            <input type="checkbox" id="useShipNames">
-            <label for="useShipNames">Use Ship Names</label>
-        </div>
+                <label>
+                    <input type="checkbox" id="useShipNames">
+                    <span class="help-toggle" data-help="useShipNamesHelp">Use Ship Names</span>
+                </label>
+                <div id="useShipNamesHelp" class="help-text">
+                    When checked, shows ship names instead of hex codes. This requires loading additional data.
+                </div>
+            </div>
 
-        <div class="button-group">
             <button id="loadData">Load Data</button>
             <button id="cancelLoad" disabled>Cancel</button>
-            <button id="refreshBtn">Refresh</button>
+            <button id="refreshBtn">Refresh Display</button>
         </div>
+
+        <div id="notices"></div>
 
         <div class="progress-container">
             <div id="progressBar"></div>
         </div>
         <div id="statusText"></div>
 
-        <div id="noticeContainer"></div>
-
         <div id="dataOutput">No data loaded</div>
 
-        <div id="lastUpdate"></div>
+        <div id="lastUpdate" style="margin-top: 20px; font-size: 0.8em; color: #666;"></div>
     </div>
 
     <script type="module" src="js/app.js"></script>
