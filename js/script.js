@@ -1,7 +1,8 @@
 class DrednotDataViewer {
     constructor() {
-        // Change baseUrl to use the proxy
-        this.baseUrl = '/proxy.php?path=';
+        // Use correct base URL format
+        this.apiBase = 'https://pub.drednot.io/prod/econ';
+        this.proxyBase = 'https://iogamesplayer.com/proxy.php?path=';
         this.data = {
             summaries: [],
             ships: [],
@@ -71,14 +72,29 @@ class DrednotDataViewer {
         const start = new Date(this.elements.startDate.value);
         const end = new Date(this.elements.endDate.value);
         const minDate = new Date('2022-11-23');
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
 
         if (start < minDate) {
             this.elements.startDate.value = '2022-11-23';
+            this.showError('Start date cannot be before 2022-11-23');
+            return false;
+        }
+
+        if (end > yesterday) {
+            this.elements.endDate.value = this.formatDate(yesterday);
+            this.showError('End date cannot be in the future');
+            return false;
         }
 
         if (end < start) {
             this.elements.endDate.value = this.elements.startDate.value;
+            this.showError('End date cannot be before start date');
+            return false;
         }
+
+        return true;
     }
 
     formatDate(date) {
@@ -86,6 +102,10 @@ class DrednotDataViewer {
     }
 
     async loadData() {
+        if (!this.validateDates()) {
+            return;
+        }
+
         this.showLoading(true);
         this.data.summaries = [];
         this.data.ships = [];
@@ -96,15 +116,15 @@ class DrednotDataViewer {
         const dateRange = this.getDateRange(startDate, endDate);
 
         try {
-            // Try to load static data but don't block if it fails
+            // Load static data first
             await Promise.allSettled([
                 this.loadItemSchema(),
                                      this.loadBotDrops()
             ]);
 
-            // Load date-specific data with progress tracking
             let completed = 0;
             const total = dateRange.length;
+            const failures = [];
 
             for (const date of dateRange) {
                 const [year, month, day] = date.split('-');
@@ -116,7 +136,8 @@ class DrednotDataViewer {
                     ]);
                 } catch (error) {
                     console.error(`Failed to load data for ${date}:`, error);
-                    continue; // Skip failed dates but continue with others
+                    failures.push(date);
+                    continue;
                 }
 
                 completed++;
@@ -127,10 +148,14 @@ class DrednotDataViewer {
                 throw new Error('No data could be loaded for the selected date range');
             }
 
+            if (failures.length > 0) {
+                this.showError(`Failed to load data for dates: ${failures.join(', ')}`);
+            }
+
             this.updateUI();
         } catch (error) {
             console.error('Error loading data:', error);
-            this.showError('Failed to load data. Please check if the dates are correct and try again.');
+            this.showError(error.message);
         } finally {
             this.showLoading(false);
         }
@@ -149,15 +174,24 @@ class DrednotDataViewer {
     }
 
     async loadSummary(year, month, day) {
-        const url = `${this.baseUrl}/${year}_${month}_${day}/summary.json`;
+        // Format date components to ensure two digits
+        month = month.toString().padStart(2, '0');
+        day = day.toString().padStart(2, '0');
+        const path = encodeURIComponent(`${year}_${month}_${day}/summary.json`);
+        const url = `${this.proxyBase}${path}`;
         const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
         this.data.summaries.push({ date: `${year}-${month}-${day}`, data });
     }
 
     async loadShips(year, month, day) {
-        const url = `${this.baseUrl}/${year}_${month}_${day}/ships.json.gz`;
+        month = month.toString().padStart(2, '0');
+        day = day.toString().padStart(2, '0');
+        const path = encodeURIComponent(`${year}_${month}_${day}/ships.json.gz`);
+        const url = `${this.proxyBase}${path}`;
         const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const compressed = await response.arrayBuffer();
         const decompressed = pako.ungzip(new Uint8Array(compressed), { to: 'string' });
         const data = JSON.parse(decompressed);
@@ -165,8 +199,12 @@ class DrednotDataViewer {
     }
 
     async loadLogs(year, month, day) {
-        const url = `${this.baseUrl}/${year}_${month}_${day}/log.json.gz`;
+        month = month.toString().padStart(2, '0');
+        day = day.toString().padStart(2, '0');
+        const path = encodeURIComponent(`${year}_${month}_${day}/log.json.gz`);
+        const url = `${this.proxyBase}${path}`;
         const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const compressed = await response.arrayBuffer();
         const decompressed = pako.ungzip(new Uint8Array(compressed), { to: 'string' });
         const data = JSON.parse(decompressed);
@@ -175,7 +213,9 @@ class DrednotDataViewer {
 
     async loadItemSchema() {
         try {
-            const url = `${this.baseUrl}/item_schema.json`;
+            // Construct correct URL for item schema
+            const path = encodeURIComponent('item_schema.json');
+            const url = `${this.proxyBase}${path}`;
             const response = await fetch(url);
             if (!response.ok) throw new Error('Failed to load item schema');
             this.data.itemSchema = await response.json();
@@ -183,14 +223,15 @@ class DrednotDataViewer {
         } catch (error) {
             console.error('Failed to load item schema:', error);
             this.errors.itemSchema = true;
-            // Set default schema for essential functionality
             this.data.itemSchema = [];
         }
     }
 
     async loadBotDrops() {
         try {
-            const url = `${this.baseUrl}/bot_drops.txt`;
+            // Construct correct URL for bot drops
+            const path = encodeURIComponent('bot_drops.txt');
+            const url = `${this.proxyBase}${path}`;
             const response = await fetch(url);
             if (!response.ok) throw new Error('Failed to load bot drops');
             this.data.botDrops = await response.text();

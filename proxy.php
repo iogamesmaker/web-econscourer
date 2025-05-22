@@ -1,9 +1,7 @@
 <?php
-// Set headers to allow cross-origin requests from iogamesplayer.com
 header('Access-Control-Allow-Origin: https://iogamesplayer.com');
 header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type');
-header('Content-Type: application/json');
 
 // Get the requested path from the query string
 $path = isset($_GET['path']) ? $_GET['path'] : '';
@@ -16,12 +14,15 @@ if (empty($path)) {
 }
 
 // Base URL for the Drednot.io API
-$baseUrl = 'https://pub.drednot.io/prod/econ/';
+$baseUrl = 'https://pub.drednot.io/prod/econ';
+
+// Remove leading slash if present
+$path = ltrim($path, '/');
 
 // Construct the full URL
-$url = $baseUrl . $path;
+$url = $baseUrl . '/' . $path;
 
-// Validate URL is from pub.drednot.io
+// Validate URL format
 if (!preg_match('/^https:\/\/pub\.drednot\.io\/prod\/econ\//', $url)) {
     http_response_code(403);
     echo json_encode(['error' => 'Invalid URL']);
@@ -38,7 +39,9 @@ curl_setopt_array($ch, [
     CURLOPT_MAXREDIRS => 5,
     CURLOPT_TIMEOUT => 30,
     CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-    CURLOPT_USERAGENT => 'web-econscourer/1.0'
+    CURLOPT_USERAGENT => 'web-econscourer/1.0',
+    CURLOPT_SSL_VERIFYPEER => true,
+    CURLOPT_SSL_VERIFYHOST => 2
 ]);
 
 // Execute cURL request
@@ -55,8 +58,10 @@ if (curl_errno($ch)) {
 
 curl_close($ch);
 
-// Set appropriate content type header based on response
-header('Content-Type: ' . $contentType);
+// Forward the original content type and response code
+if ($contentType) {
+    header('Content-Type: ' . $contentType);
+}
 http_response_code($httpCode);
 
 // Output the response
