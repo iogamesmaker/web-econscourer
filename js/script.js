@@ -1,6 +1,5 @@
 class DrednotDataViewer {
     constructor() {
-        // Using cors-anywhere as a temporary solution
         this.corsProxy = 'https://cors-anywhere.herokuapp.com/';
         this.baseUrl = 'https://pub.drednot.io/prod/econ';
         this.data = {
@@ -22,14 +21,14 @@ class DrednotDataViewer {
         warning.className = 'cors-warning';
         warning.innerHTML = `
         <div class="warning-content">
-        <h3>⚠️ First Time Setup Required</h3>
-        <p>To use this tool, you need to enable CORS access:</p>
+        <h3>Dumb thing</h3>
+        <p>To use this shit thing, you need to enable CORS access, for some reason CORS is a thing and I fucking hate it.</p>
         <ol>
-        <li>Click <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank">here</a> to open CORS Anywhere</li>
+        <li>Click <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank">here</a> to open the thing</li>
         <li>Click the "Request temporary access" button</li>
         <li>Return here and refresh the page</li>
         </ol>
-        <button class="warning-close">Got it!</button>
+        <button class="warning-close">(already) done.</button>
         </div>
         `;
         document.body.appendChild(warning);
@@ -39,16 +38,24 @@ class DrednotDataViewer {
         });
     }
 
-    async fetchWithCors(url) {
+    async fetchWithCors(url, options = {}) {
         try {
             const response = await fetch(this.corsProxy + url, {
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    ...options.headers
                 }
             });
+
+            if (response.status === 404) {
+                console.warn(`Resource not found: ${url}`);
+                return null;
+            }
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
+
             return response;
         } catch (error) {
             console.error(`Error fetching ${url}:`, error);
@@ -89,17 +96,25 @@ class DrednotDataViewer {
     }
 
     setDefaultDates() {
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
+        // Get yesterday's date in UTC
+        const now = new Date();
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 2); // Subtract 2 days to ensure data exists
 
         const minDate = '2022-11-23';
+        const maxDate = this.formatDate(yesterday);
+
         this.elements.startDate.min = minDate;
         this.elements.endDate.min = minDate;
-        this.elements.startDate.max = this.formatDate(yesterday);
-        this.elements.endDate.max = this.formatDate(yesterday);
+        this.elements.startDate.max = maxDate;
+        this.elements.endDate.max = maxDate;
 
-        this.elements.startDate.value = this.formatDate(yesterday);
+        // Set default to last 7 days or up to min date
+        const weekAgo = new Date(yesterday);
+        weekAgo.setDate(yesterday.getDate() - 6);
+        const startDate = new Date(Math.max(new Date(minDate), weekAgo));
+
+        this.elements.startDate.value = this.formatDate(startDate);
         this.elements.endDate.value = this.formatDate(yesterday);
     }
 
@@ -107,13 +122,20 @@ class DrednotDataViewer {
         const start = new Date(this.elements.startDate.value);
         const end = new Date(this.elements.endDate.value);
         const minDate = new Date('2022-11-23');
+        const maxDate = new Date();
+        maxDate.setDate(maxDate.getDate()); // Data is available up to today.
 
         if (start < minDate) {
             this.elements.startDate.value = '2022-11-23';
         }
-
+        if (start > maxDate) {
+            this.elements.startDate.value = this.formatDate(maxDate);
+        }
         if (end < start) {
             this.elements.endDate.value = this.elements.startDate.value;
+        }
+        if (end > maxDate) {
+            this.elements.endDate.value = this.formatDate(maxDate);
         }
     }
 
@@ -121,11 +143,36 @@ class DrednotDataViewer {
         return date.toISOString().split('T')[0];
     }
 
-    async loadData() {
-        this.showLoading(true);
+    showErrors(errors) {
+        const errorContainer = document.createElement('div');
+        errorContainer.className = 'error-message';
+        errorContainer.innerHTML = `
+        <h3>⚠️ Warnings</h3>
+        <ul>
+        ${errors.map(error => `<li>${error}</li>`).join('')}
+        </ul>
+        `;
+
+        const existingError = document.querySelector('.error-message');
+        if (existingError) {
+            existingError.remove();
+        }
+
+        document.querySelector('.data-content').insertBefore(
+            errorContainer,
+            document.querySelector('.data-content').firstChild
+        );
+    }
+
+    clearData() {
         this.data.summaries = [];
         this.data.ships = [];
         this.data.logs = [];
+    }
+
+    async loadData() {
+        this.showLoading(true);
+        this.clearData();
 
         const startDate = new Date(this.elements.startDate.value);
         const endDate = new Date(this.elements.endDate.value);
@@ -140,24 +187,42 @@ class DrednotDataViewer {
 
             // Then load date-specific data with progress tracking
             let completed = 0;
+            let errors = [];
             const total = dateRange.length;
 
             for (const date of dateRange) {
                 const [year, month, day] = date.split('-');
-                await Promise.all([
-                    this.loadSummary(year, month, day),
-                                  this.loadShips(year, month, day),
-                                  this.loadLogs(year, month, day)
-                ]);
+                try {
+                    const results = await Promise.all([
+                        this.loadSummary(year, month, day),
+                                                      this.loadShips(year, month, day),
+                                                      this.loadLogs(year, month, day)
+                    ]);
+
+                    // Check if any of the requests failed
+                    if (results.some(r => r === false)) {
+                        errors.push(`Data not available for ${date}`);
+                    }
+                } catch (error) {
+                    errors.push(`Error loading data for ${date}: ${error.message}`);
+                }
 
                 completed++;
                 this.updateProgress(completed / total * 100);
             }
 
-            this.updateUI();
+            if (errors.length > 0) {
+                this.showErrors(errors);
+            }
+
+            if (this.data.summaries.length > 0) {
+                this.updateUI();
+            } else {
+                throw new Error('No data available for the selected date range');
+            }
         } catch (error) {
             console.error('Error loading data:', error);
-            alert('Error loading data. Please check the console for details.');
+            this.showErrors([error.message]);
         } finally {
             this.showLoading(false);
         }
@@ -179,26 +244,32 @@ class DrednotDataViewer {
     async loadSummary(year, month, day) {
         const url = `${this.baseUrl}/${year}_${month}_${day}/summary.json`;
         const response = await this.fetchWithCors(url);
+        if (!response) return false;
         const data = await response.json();
         this.data.summaries.push({ date: `${year}-${month}-${day}`, data });
+        return true;
     }
 
     async loadShips(year, month, day) {
         const url = `${this.baseUrl}/${year}_${month}_${day}/ships.json.gz`;
         const response = await this.fetchWithCors(url);
+        if (!response) return false;
         const compressed = await response.arrayBuffer();
         const decompressed = pako.ungzip(new Uint8Array(compressed), { to: 'string' });
         const data = JSON.parse(decompressed);
         this.data.ships.push(...data.map(ship => ({ ...ship, date: `${year}-${month}-${day}` })));
+        return true;
     }
 
     async loadLogs(year, month, day) {
         const url = `${this.baseUrl}/${year}_${month}_${day}/log.json.gz`;
         const response = await this.fetchWithCors(url);
+        if (!response) return false;
         const compressed = await response.arrayBuffer();
         const decompressed = pako.ungzip(new Uint8Array(compressed), { to: 'string' });
         const data = JSON.parse(decompressed);
         this.data.logs.push(...data.map(log => ({ ...log, date: `${year}-${month}-${day}` })));
+        return true;
     }
 
     async loadItemSchema() {
