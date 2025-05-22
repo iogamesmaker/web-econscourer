@@ -1,12 +1,18 @@
 class DrednotDataViewer {
     constructor() {
-        this.baseUrl = 'https://pub.drednot.io/prod/econ';
+        this.baseUrl = 'https://iogamesplayer.com/proxy.php?url=' + encodeURIComponent('https://pub.drednot.io/prod/econ');
         this.data = {
             summaries: [],
             ships: [],
             logs: [],
             itemSchema: null,
             botDrops: null
+        };
+
+        // Add error tracking
+        this.errors = {
+            itemSchema: false,
+            botDrops: false
         };
 
         this.initializeElements();
@@ -90,32 +96,41 @@ class DrednotDataViewer {
         const dateRange = this.getDateRange(startDate, endDate);
 
         try {
-            // First load static data
-            await Promise.all([
+            // Try to load static data but don't block if it fails
+            await Promise.allSettled([
                 this.loadItemSchema(),
-                this.loadBotDrops()
+                                     this.loadBotDrops()
             ]);
 
-            // Then load date-specific data with progress tracking
+            // Load date-specific data with progress tracking
             let completed = 0;
             const total = dateRange.length;
 
             for (const date of dateRange) {
                 const [year, month, day] = date.split('-');
-                await Promise.all([
-                    this.loadSummary(year, month, day),
-                    this.loadShips(year, month, day),
-                    this.loadLogs(year, month, day)
-                ]);
+                try {
+                    await Promise.all([
+                        this.loadSummary(year, month, day),
+                                      this.loadShips(year, month, day),
+                                      this.loadLogs(year, month, day)
+                    ]);
+                } catch (error) {
+                    console.error(`Failed to load data for ${date}:`, error);
+                    continue; // Skip failed dates but continue with others
+                }
 
                 completed++;
                 this.updateProgress(completed / total * 100);
             }
 
+            if (this.data.summaries.length === 0) {
+                throw new Error('No data could be loaded for the selected date range');
+            }
+
             this.updateUI();
         } catch (error) {
             console.error('Error loading data:', error);
-            alert('Error loading data. Please check the console for details.');
+            this.showError('Failed to load data. Please check if the dates are correct and try again.');
         } finally {
             this.showLoading(false);
         }
@@ -159,15 +174,32 @@ class DrednotDataViewer {
     }
 
     async loadItemSchema() {
-        const url = `${this.baseUrl}/item_schema.json`;
-        const response = await fetch(url);
-        this.data.itemSchema = await response.json();
+        try {
+            const url = `${this.baseUrl}/item_schema.json`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to load item schema');
+            this.data.itemSchema = await response.json();
+            this.errors.itemSchema = false;
+        } catch (error) {
+            console.error('Failed to load item schema:', error);
+            this.errors.itemSchema = true;
+            // Set default schema for essential functionality
+            this.data.itemSchema = [];
+        }
     }
 
     async loadBotDrops() {
-        const url = `${this.baseUrl}/bot_drops.txt`;
-        const response = await fetch(url);
-        this.data.botDrops = await response.text();
+        try {
+            const url = `${this.baseUrl}/bot_drops.txt`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to load bot drops');
+            this.data.botDrops = await response.text();
+            this.errors.botDrops = false;
+        } catch (error) {
+            console.error('Failed to load bot drops:', error);
+            this.errors.botDrops = true;
+            this.data.botDrops = 'Bot drops data unavailable due to access restrictions.';
+        }
     }
 
     updateProgress(percentage) {
@@ -185,8 +217,28 @@ class DrednotDataViewer {
         this.updateSummary();
         this.updateShips();
         this.updateLogs();
-        this.updateItems();
-        this.updateDrops();
+
+        if (this.errors.itemSchema) {
+            document.querySelector('.items-list').innerHTML = `
+            <div class="error-state">
+            <h3>Item Schema Unavailable</h3>
+            <p>Due to access restrictions, the item schema could not be loaded.</p>
+            </div>
+            `;
+        } else {
+            this.updateItems();
+        }
+
+        if (this.errors.botDrops) {
+            document.querySelector('.drops-list').innerHTML = `
+            <div class="error-state">
+            <h3>Bot Drops Data Unavailable</h3>
+            <p>Due to access restrictions, the bot drops data could not be loaded.</p>
+            </div>
+            `;
+        } else {
+            this.updateDrops();
+        }
     }
 
     updateDateRangeInfo() {
@@ -319,6 +371,22 @@ class DrednotDataViewer {
         this.elements.tabContents.forEach(content => {
             content.classList.toggle('active', content.id === tabId);
         });
+    }
+
+    showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = message;
+
+        // Remove any existing error messages
+        document.querySelectorAll('.error-message').forEach(el => el.remove());
+
+        // Insert error message at the top of the content
+        const content = document.querySelector('.data-content');
+        content.insertBefore(errorDiv, content.firstChild);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => errorDiv.remove(), 5000);
     }
 
     showLoading(show) {
