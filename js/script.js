@@ -1,8 +1,8 @@
 class DrednotDataViewer {
     constructor() {
-        // Use correct base URL format
+        // Update proxy URL to correct path
         this.apiBase = 'https://pub.drednot.io/prod/econ';
-        this.proxyBase = 'https://iogamesplayer.com/proxy.php?path=';
+        this.proxyBase = 'https://iogamesplayer.com/web-econscourer/proxy.php?path=';
         this.data = {
             summaries: [],
             ships: [],
