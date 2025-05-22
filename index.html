@@ -3,210 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Econscourer</title>
-    <style>
-        body {
-            font-family: monospace;
-            margin: 20px;
-            background: #1e1e1e;
-            color: #d4d4d4;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .controls {
-            margin-bottom: 20px;
-            padding: 15px;
-            background: #2d2d2d;
-            border-radius: 5px;
-        }
-
-        .search-container {
-            position: relative;
-            display: inline-block;
-        }
-
-        #itemSuggestions {
-            display: none;
-            position: absolute;
-            background: #333;
-            border: 1px solid #555;
-            max-height: 200px;
-            overflow-y: auto;
-            width: 100%;
-            z-index: 1000;
-        }
-
-        #itemSuggestions div {
-            padding: 5px 10px;
-            cursor: pointer;
-        }
-
-        #itemSuggestions div:hover {
-            background: #444;
-        }
-
-        input, select {
-            background: #333;
-            color: #fff;
-            border: 1px solid #555;
-            padding: 5px;
-            margin: 5px;
-        }
-
-        button {
-            background: #0066cc;
-            color: white;
-            border: none;
-            padding: 5px 15px;
-            cursor: pointer;
-            margin: 5px;
-        }
-
-        button:disabled {
-            background: #444;
-            cursor: not-allowed;
-        }
-
-        button:hover:not(:disabled) {
-            background: #0077ee;
-        }
-
-        .progress-container {
-            width: 100%;
-            background: #333;
-            height: 20px;
-            margin: 10px 0;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-
-        #progressBar {
-            width: 0%;
-            height: 100%;
-            background: #0066cc;
-            transition: width 0.3s ease;
-        }
-
-        #dataOutput {
-            background: #2d2d2d;
-            padding: 15px;
-            border-radius: 5px;
-            white-space: pre-wrap;
-        }
-
-        .even-row {
-            background: #2d2d2d;
-        }
-
-        .odd-row {
-            background: #333333;
-        }
-
-        .notice {
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
-        }
-
-        .notice.error {
-            background: #662222;
-            color: #ffaaaa;
-        }
-
-        .notice.warning {
-            background: #666622;
-            color: #ffffaa;
-        }
-
-        .notice.success {
-            background: #226622;
-            color: #aaffaa;
-        }
-
-        .help-text {
-            display: none;
-            background: #333;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 5px 0;
-        }
-
-        .help-toggle {
-            cursor: help;
-            text-decoration: underline;
-            color: #0066cc;
-        }
-
-        .filter-group {
-            margin: 10px 0;
-        }
-    </style>
+    <title>Drednot.io Economic Data Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Include pako for gzip decompression -->
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>Web Econscourer</h1>
+        <header>
+            <h1>Drednot.io Economic Data Viewer</h1>
+            <div class="controls">
+                <select id="instance">
+                    <option value="prod">Production</option>
+                    <option value="test">Test</option>
+                </select>
+                <input type="date" id="dateSelect">
+                <button id="loadData">Load Data</button>
+            </div>
+        </header>
 
-        <div class="controls">
-            <div class="filter-group">
-                <label for="startDate">Start Date:</label>
-                <input type="date" id="startDate">
-                <label for="endDate">End Date:</label>
-                <input type="date" id="endDate">
+        <main>
+            <div class="data-tabs">
+                <button class="tab-btn active" data-tab="summary">Summary</button>
+                <button class="tab-btn" data-tab="ships">Ships</button>
+                <button class="tab-btn" data-tab="logs">Logs</button>
+                <button class="tab-btn" data-tab="items">Item Schema</button>
+                <button class="tab-btn" data-tab="drops">Bot Drops</button>
             </div>
 
-            <div class="filter-group">
-                <label for="itemFilter">Item Filter:</label>
-                <div class="search-container">
-                    <input type="text" id="itemFilter" placeholder="Filter by item...">
-                    <div id="itemSuggestions"></div>
+            <div class="data-content">
+                <div id="loading" class="hidden">Loading...</div>
+
+                <div id="summary" class="tab-content active">
+                    <h2>Summary Data</h2>
+                    <div class="summary-stats"></div>
                 </div>
 
-                <label for="sourceFilter">Source Filter:</label>
-                <input type="text" id="sourceFilter" placeholder="Filter by source...">
+                <div id="ships" class="tab-content">
+                    <h2>Ships Data</h2>
+                    <input type="text" id="shipSearch" placeholder="Search ships...">
+                    <div class="ships-list"></div>
+                </div>
 
-                <label for="destFilter">Destination Filter:</label>
-                <input type="text" id="destFilter" placeholder="Filter by destination...">
+                <div id="logs" class="tab-content">
+                    <h2>Activity Logs</h2>
+                    <input type="text" id="logSearch" placeholder="Search logs...">
+                    <div class="logs-list"></div>
+                </div>
+
+                <div id="items" class="tab-content">
+                    <h2>Item Schema</h2>
+                    <input type="text" id="itemSearch" placeholder="Search items...">
+                    <div class="items-list"></div>
+                </div>
+
+                <div id="drops" class="tab-content">
+                    <h2>Bot Drops</h2>
+                    <div class="drops-list"></div>
+                </div>
             </div>
-
-            <div class="filter-group">
-                <label>
-                    <input type="checkbox" id="showBots" checked>
-                    <span class="help-toggle" data-help="showBotsHelp">Show Bot Trades Only</span>
-                </label>
-                <div id="showBotsHelp" class="help-text">
-                    When checked, only shows trades between bot ships (those with hex codes).
-                </div>
-
-                <label>
-                    <input type="checkbox" id="useShipNames">
-                    <span class="help-toggle" data-help="useShipNamesHelp">Use Ship Names</span>
-                </label>
-                <div id="useShipNamesHelp" class="help-text">
-                    When checked, shows ship names instead of hex codes. This requires loading additional data.
-                </div>
-            </div>
-
-            <button id="loadData">Load Data</button>
-            <button id="cancelLoad" disabled>Cancel</button>
-            <button id="refreshBtn">Refresh Display</button>
-        </div>
-
-        <div id="notices"></div>
-
-        <div class="progress-container">
-            <div id="progressBar"></div>
-        </div>
-        <div id="statusText"></div>
-
-        <div id="dataOutput">No data loaded</div>
-
-        <div id="lastUpdate" style="margin-top: 20px; font-size: 0.8em; color: #666;"></div>
+        </main>
     </div>
-
-    <script type="module" src="js/app.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
