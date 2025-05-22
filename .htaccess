@@ -1,0 +1,17 @@
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "https://iogamesplayer.com"
+    Header set Access-Control-Allow-Methods "GET"
+    Header set Access-Control-Allow-Headers "Content-Type"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Ensure direct access to existing files/directories
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Route all other requests to index.html
+    RewriteRule . index.html [L]
+</IfModule>

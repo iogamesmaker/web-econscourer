@@ -1,6 +1,7 @@
 class DrednotDataViewer {
     constructor() {
-        this.baseUrl = 'https://iogamesplayer.com/proxy.php?url=' + encodeURIComponent('https://pub.drednot.io/prod/econ');
+        // Change baseUrl to use the proxy
+        this.baseUrl = '/proxy.php?path=';
         this.data = {
             summaries: [],
             ships: [],
@@ -9,7 +10,6 @@ class DrednotDataViewer {
             botDrops: null
         };
 
-        // Add error tracking
         this.errors = {
             itemSchema: false,
             botDrops: false
