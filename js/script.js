@@ -1,8 +1,8 @@
 class DrednotDataViewer {
     constructor() {
-        // Update proxy URL to correct path
-        this.apiBase = 'https://pub.drednot.io/prod/econ';
-        this.proxyBase = 'https://iogamesplayer.com/web-econscourer/proxy.php?path=';
+        // Using cors-anywhere as a temporary solution
+        this.corsProxy = 'https://cors-anywhere.herokuapp.com/';
+        this.baseUrl = 'https://pub.drednot.io/prod/econ';
         this.data = {
             summaries: [],
             ships: [],
@@ -11,14 +11,49 @@ class DrednotDataViewer {
             botDrops: null
         };
 
-        this.errors = {
-            itemSchema: false,
-            botDrops: false
-        };
-
         this.initializeElements();
         this.addEventListeners();
         this.setDefaultDates();
+        this.showCorsWarning();
+    }
+
+    showCorsWarning() {
+        const warning = document.createElement('div');
+        warning.className = 'cors-warning';
+        warning.innerHTML = `
+        <div class="warning-content">
+        <h3>⚠️ First Time Setup Required</h3>
+        <p>To use this tool, you need to enable CORS access:</p>
+        <ol>
+        <li>Click <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank">here</a> to open CORS Anywhere</li>
+        <li>Click the "Request temporary access" button</li>
+        <li>Return here and refresh the page</li>
+        </ol>
+        <button class="warning-close">Got it!</button>
+        </div>
+        `;
+        document.body.appendChild(warning);
+
+        warning.querySelector('.warning-close').addEventListener('click', () => {
+            warning.remove();
+        });
+    }
+
+    async fetchWithCors(url) {
+        try {
+            const response = await fetch(this.corsProxy + url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response;
+        } catch (error) {
+            console.error(`Error fetching ${url}:`, error);
+            throw error;
+        }
     }
 
     initializeElements() {
@@ -72,29 +107,14 @@ class DrednotDataViewer {
         const start = new Date(this.elements.startDate.value);
         const end = new Date(this.elements.endDate.value);
         const minDate = new Date('2022-11-23');
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
 
         if (start < minDate) {
             this.elements.startDate.value = '2022-11-23';
-            this.showError('Start date cannot be before 2022-11-23');
-            return false;
-        }
-
-        if (end > yesterday) {
-            this.elements.endDate.value = this.formatDate(yesterday);
-            this.showError('End date cannot be in the future');
-            return false;
         }
 
         if (end < start) {
             this.elements.endDate.value = this.elements.startDate.value;
-            this.showError('End date cannot be before start date');
-            return false;
         }
-
-        return true;
     }
 
     formatDate(date) {
@@ -102,10 +122,6 @@ class DrednotDataViewer {
     }
 
     async loadData() {
-        if (!this.validateDates()) {
-            return;
-        }
-
         this.showLoading(true);
         this.data.summaries = [];
         this.data.ships = [];
@@ -116,46 +132,32 @@ class DrednotDataViewer {
         const dateRange = this.getDateRange(startDate, endDate);
 
         try {
-            // Load static data first
-            await Promise.allSettled([
+            // First load static data
+            await Promise.all([
                 this.loadItemSchema(),
-                                     this.loadBotDrops()
+                              this.loadBotDrops()
             ]);
 
+            // Then load date-specific data with progress tracking
             let completed = 0;
             const total = dateRange.length;
-            const failures = [];
 
             for (const date of dateRange) {
                 const [year, month, day] = date.split('-');
-                try {
-                    await Promise.all([
-                        this.loadSummary(year, month, day),
-                                      this.loadShips(year, month, day),
-                                      this.loadLogs(year, month, day)
-                    ]);
-                } catch (error) {
-                    console.error(`Failed to load data for ${date}:`, error);
-                    failures.push(date);
-                    continue;
-                }
+                await Promise.all([
+                    this.loadSummary(year, month, day),
+                                  this.loadShips(year, month, day),
+                                  this.loadLogs(year, month, day)
+                ]);
 
                 completed++;
                 this.updateProgress(completed / total * 100);
             }
 
-            if (this.data.summaries.length === 0) {
-                throw new Error('No data could be loaded for the selected date range');
-            }
-
-            if (failures.length > 0) {
-                this.showError(`Failed to load data for dates: ${failures.join(', ')}`);
-            }
-
             this.updateUI();
         } catch (error) {
             console.error('Error loading data:', error);
-            this.showError(error.message);
+            alert('Error loading data. Please check the console for details.');
         } finally {
             this.showLoading(false);
         }
@@ -173,25 +175,17 @@ class DrednotDataViewer {
         return dates;
     }
 
+    // Modified fetch methods
     async loadSummary(year, month, day) {
-        // Format date components to ensure two digits
-        month = month.toString().padStart(2, '0');
-        day = day.toString().padStart(2, '0');
-        const path = encodeURIComponent(`${year}_${month}_${day}/summary.json`);
-        const url = `${this.proxyBase}${path}`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const url = `${this.baseUrl}/${year}_${month}_${day}/summary.json`;
+        const response = await this.fetchWithCors(url);
         const data = await response.json();
         this.data.summaries.push({ date: `${year}-${month}-${day}`, data });
     }
 
     async loadShips(year, month, day) {
-        month = month.toString().padStart(2, '0');
-        day = day.toString().padStart(2, '0');
-        const path = encodeURIComponent(`${year}_${month}_${day}/ships.json.gz`);
-        const url = `${this.proxyBase}${path}`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const url = `${this.baseUrl}/${year}_${month}_${day}/ships.json.gz`;
+        const response = await this.fetchWithCors(url);
         const compressed = await response.arrayBuffer();
         const decompressed = pako.ungzip(new Uint8Array(compressed), { to: 'string' });
         const data = JSON.parse(decompressed);
@@ -199,12 +193,8 @@ class DrednotDataViewer {
     }
 
     async loadLogs(year, month, day) {
-        month = month.toString().padStart(2, '0');
-        day = day.toString().padStart(2, '0');
-        const path = encodeURIComponent(`${year}_${month}_${day}/log.json.gz`);
-        const url = `${this.proxyBase}${path}`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const url = `${this.baseUrl}/${year}_${month}_${day}/log.json.gz`;
+        const response = await this.fetchWithCors(url);
         const compressed = await response.arrayBuffer();
         const decompressed = pako.ungzip(new Uint8Array(compressed), { to: 'string' });
         const data = JSON.parse(decompressed);
@@ -212,35 +202,15 @@ class DrednotDataViewer {
     }
 
     async loadItemSchema() {
-        try {
-            // Construct correct URL for item schema
-            const path = encodeURIComponent('item_schema.json');
-            const url = `${this.proxyBase}${path}`;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Failed to load item schema');
-            this.data.itemSchema = await response.json();
-            this.errors.itemSchema = false;
-        } catch (error) {
-            console.error('Failed to load item schema:', error);
-            this.errors.itemSchema = true;
-            this.data.itemSchema = [];
-        }
+        const url = `${this.baseUrl}/item_schema.json`;
+        const response = await this.fetchWithCors(url);
+        this.data.itemSchema = await response.json();
     }
 
     async loadBotDrops() {
-        try {
-            // Construct correct URL for bot drops
-            const path = encodeURIComponent('bot_drops.txt');
-            const url = `${this.proxyBase}${path}`;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Failed to load bot drops');
-            this.data.botDrops = await response.text();
-            this.errors.botDrops = false;
-        } catch (error) {
-            console.error('Failed to load bot drops:', error);
-            this.errors.botDrops = true;
-            this.data.botDrops = 'Bot drops data unavailable due to access restrictions.';
-        }
+        const url = `${this.baseUrl}/bot_drops.txt`;
+        const response = await this.fetchWithCors(url);
+        this.data.botDrops = await response.text();
     }
 
     updateProgress(percentage) {
@@ -258,37 +228,17 @@ class DrednotDataViewer {
         this.updateSummary();
         this.updateShips();
         this.updateLogs();
-
-        if (this.errors.itemSchema) {
-            document.querySelector('.items-list').innerHTML = `
-            <div class="error-state">
-            <h3>Item Schema Unavailable</h3>
-            <p>Due to access restrictions, the item schema could not be loaded.</p>
-            </div>
-            `;
-        } else {
-            this.updateItems();
-        }
-
-        if (this.errors.botDrops) {
-            document.querySelector('.drops-list').innerHTML = `
-            <div class="error-state">
-            <h3>Bot Drops Data Unavailable</h3>
-            <p>Due to access restrictions, the bot drops data could not be loaded.</p>
-            </div>
-            `;
-        } else {
-            this.updateDrops();
-        }
+        this.updateItems();
+        this.updateDrops();
     }
 
     updateDateRangeInfo() {
         const startDate = this.elements.startDate.value;
         const endDate = this.elements.endDate.value;
         this.elements.dateRangeInfo.innerHTML = `
-            <h3>Date Range</h3>
-            <p>From: ${startDate} To: ${endDate}</p>
-            <p>Total Days: ${this.data.summaries.length}</p>
+        <h3>Date Range</h3>
+        <p>From: ${startDate} To: ${endDate}</p>
+        <p>Total Days: ${this.data.summaries.length}</p>
         `;
     }
 
@@ -323,22 +273,22 @@ class DrednotDataViewer {
         });
 
         let html = `
-            <div class="stat-card">
-                <h3>Total Ships</h3>
-                <p>${aggregatedData.totalShips}</p>
-            </div>
-            <div class="stat-card">
-                <h3>Total Logs</h3>
-                <p>${aggregatedData.totalLogs}</p>
-            </div>
-            <div class="stat-card">
-                <h3>Top Items Held</h3>
-                ${this.getTopItems(aggregatedData.itemsHeld, 5)}
-            </div>
-            <div class="stat-card">
-                <h3>Top Items Moved</h3>
-                ${this.getTopItems(aggregatedData.itemsMoved, 5)}
-            </div>
+        <div class="stat-card">
+        <h3>Total Ships</h3>
+        <p>${aggregatedData.totalShips}</p>
+        </div>
+        <div class="stat-card">
+        <h3>Total Logs</h3>
+        <p>${aggregatedData.totalLogs}</p>
+        </div>
+        <div class="stat-card">
+        <h3>Top Items Held</h3>
+        ${this.getTopItems(aggregatedData.itemsHeld, 5)}
+        </div>
+        <div class="stat-card">
+        <h3>Top Items Moved</h3>
+        ${this.getTopItems(aggregatedData.itemsMoved, 5)}
+        </div>
         `;
 
         summaryContainer.innerHTML = html;
@@ -349,12 +299,12 @@ class DrednotDataViewer {
         const ships = this.data.ships.slice(0, 100);
 
         const html = ships.map(ship => `
-            <div class="ship-card">
-                <h3 style="color: #${ship.color.toString(16).padStart(6, '0')}">${ship.name}</h3>
-                <p>ID: ${ship.hex_code}</p>
-                <p>Date: ${ship.date}</p>
-                <p>Items: ${Object.keys(ship.items).length}</p>
-            </div>
+        <div class="ship-card">
+        <h3 style="color: #${ship.color.toString(16).padStart(6, '0')}">${ship.name}</h3>
+        <p>ID: ${ship.hex_code}</p>
+        <p>Date: ${ship.date}</p>
+        <p>Items: ${Object.keys(ship.items).length}</p>
+        </div>
         `).join('');
 
         shipsContainer.innerHTML = html;
@@ -365,13 +315,13 @@ class DrednotDataViewer {
         const logs = this.data.logs.slice(0, 100);
 
         const html = logs.map(log => `
-            <div class="log-entry">
-                <p>${new Date(log.time * 1000).toLocaleString()}</p>
-                <p>Date: ${log.date}</p>
-                <p>Zone: ${log.zone}</p>
-                <p>Item: ${log.item} (${log.count})</p>
-                <p>Source: ${log.src} → Destination: ${log.dst}</p>
-            </div>
+        <div class="log-entry">
+        <p>${new Date(log.time * 1000).toLocaleString()}</p>
+        <p>Date: ${log.date}</p>
+        <p>Zone: ${log.zone}</p>
+        <p>Item: ${log.item} (${log.count})</p>
+        <p>Source: ${log.src} → Destination: ${log.dst}</p>
+        </div>
         `).join('');
 
         logsContainer.innerHTML = html;
@@ -381,11 +331,11 @@ class DrednotDataViewer {
         const itemsContainer = document.querySelector('.items-list');
 
         const html = this.data.itemSchema.map(item => `
-            <div class="item-card">
-                <h3>${item.name}</h3>
-                <p>ID: ${item.id}</p>
-                <p>Type: ${item.type}</p>
-            </div>
+        <div class="item-card">
+        <h3>${item.name}</h3>
+        <p>ID: ${item.id}</p>
+        <p>Type: ${item.type}</p>
+        </div>
         `).join('');
 
         itemsContainer.innerHTML = html;
@@ -398,10 +348,10 @@ class DrednotDataViewer {
 
     getTopItems(items, count) {
         return Object.entries(items)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, count)
-            .map(([id, count]) => `<p>${id}: ${count}</p>`)
-            .join('');
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, count)
+        .map(([id, count]) => `<p>${id}: ${count}</p>`)
+        .join('');
     }
 
     switchTab(tabId) {
@@ -412,22 +362,6 @@ class DrednotDataViewer {
         this.elements.tabContents.forEach(content => {
             content.classList.toggle('active', content.id === tabId);
         });
-    }
-
-    showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        errorDiv.textContent = message;
-
-        // Remove any existing error messages
-        document.querySelectorAll('.error-message').forEach(el => el.remove());
-
-        // Insert error message at the top of the content
-        const content = document.querySelector('.data-content');
-        content.insertBefore(errorDiv, content.firstChild);
-
-        // Auto-remove after 5 seconds
-        setTimeout(() => errorDiv.remove(), 5000);
     }
 
     showLoading(show) {
@@ -441,19 +375,19 @@ class DrednotDataViewer {
         if (!this.data.ships.length) return;
 
         const filtered = this.data.ships.filter(ship =>
-            ship.name.toLowerCase().includes(query.toLowerCase()) ||
-            ship.hex_code.toLowerCase().includes(query.toLowerCase()) ||
-            ship.date.includes(query)
+        ship.name.toLowerCase().includes(query.toLowerCase()) ||
+        ship.hex_code.toLowerCase().includes(query.toLowerCase()) ||
+        ship.date.includes(query)
         );
 
         const shipsContainer = document.querySelector('.ships-list');
         shipsContainer.innerHTML = filtered.slice(0, 100).map(ship => `
-            <div class="ship-card">
-                <h3 style="color: #${ship.color.toString(16).padStart(6, '0')}">${ship.name}</h3>
-                <p>ID: ${ship.hex_code}</p>
-                <p>Date: ${ship.date}</p>
-                <p>Items: ${Object.keys(ship.items).length}</p>
-            </div>
+        <div class="ship-card">
+        <h3 style="color: #${ship.color.toString(16).padStart(6, '0')}">${ship.name}</h3>
+        <p>ID: ${ship.hex_code}</p>
+        <p>Date: ${ship.date}</p>
+        <p>Items: ${Object.keys(ship.items).length}</p>
+        </div>
         `).join('');
     }
 
@@ -461,22 +395,22 @@ class DrednotDataViewer {
         if (!this.data.logs.length) return;
 
         const filtered = this.data.logs.filter(log =>
-            log.zone.toLowerCase().includes(query.toLowerCase()) ||
-            log.src.toLowerCase().includes(query.toLowerCase()) ||
-            log.dst.toLowerCase().includes(query.toLowerCase()) ||
-            log.item.toString().includes(query) ||
-            log.date.includes(query)
+        log.zone.toLowerCase().includes(query.toLowerCase()) ||
+        log.src.toLowerCase().includes(query.toLowerCase()) ||
+        log.dst.toLowerCase().includes(query.toLowerCase()) ||
+        log.item.toString().includes(query) ||
+        log.date.includes(query)
         );
 
         const logsContainer = document.querySelector('.logs-list');
         logsContainer.innerHTML = filtered.slice(0, 100).map(log => `
-            <div class="log-entry">
-                <p>${new Date(log.time * 1000).toLocaleString()}</p>
-                <p>Date: ${log.date}</p>
-                <p>Zone: ${log.zone}</p>
-                <p>Item: ${log.item} (${log.count})</p>
-                <p>Source: ${log.src} → Destination: ${log.dst}</p>
-            </div>
+        <div class="log-entry">
+        <p>${new Date(log.time * 1000).toLocaleString()}</p>
+        <p>Date: ${log.date}</p>
+        <p>Zone: ${log.zone}</p>
+        <p>Item: ${log.item} (${log.count})</p>
+        <p>Source: ${log.src} → Destination: ${log.dst}</p>
+        </div>
         `).join('');
     }
 
@@ -484,18 +418,18 @@ class DrednotDataViewer {
         if (!this.data.itemSchema) return;
 
         const filtered = this.data.itemSchema.filter(item =>
-            item.name.toLowerCase().includes(query.toLowerCase()) ||
-            item.id.toString().includes(query) ||
-            item.type.toLowerCase().includes(query.toLowerCase())
+        item.name.toLowerCase().includes(query.toLowerCase()) ||
+        item.id.toString().includes(query) ||
+        item.type.toLowerCase().includes(query.toLowerCase())
         );
 
         const itemsContainer = document.querySelector('.items-list');
         itemsContainer.innerHTML = filtered.map(item => `
-            <div class="item-card">
-                <h3>${item.name}</h3>
-                <p>ID: ${item.id}</p>
-                <p>Type: ${item.type}</p>
-            </div>
+        <div class="item-card">
+        <h3>${item.name}</h3>
+        <p>ID: ${item.id}</p>
+        <p>Type: ${item.type}</p>
+        </div>
         `).join('');
     }
 }
