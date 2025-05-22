@@ -10,10 +10,30 @@ class DrednotDataViewer {
             botDrops: null
         };
 
+        // Add current UTC time
+        this.currentUTC = new Date();
         this.initializeElements();
         this.addEventListeners();
         this.setDefaultDates();
         this.showCorsWarning();
+        this.showCurrentTime();
+    }
+
+    formatDateForUrl(year, month, day) {
+        return `${Number(year)}_${Number(month)}_${Number(day)}`;
+    }
+
+    showCurrentTime() {
+        const timeDisplay = document.createElement('div');
+        timeDisplay.className = 'current-time';
+        timeDisplay.innerHTML = `
+        <p>Current UTC: ${this.formatDateTime(this.currentUTC)}</p>
+        `;
+        document.querySelector('.controls').appendChild(timeDisplay);
+    }
+
+    formatDateTime(date) {
+        return date.toISOString().slice(0, 19).replace('T', ' ');
     }
 
     showCorsWarning() {
@@ -38,13 +58,15 @@ class DrednotDataViewer {
         });
     }
 
-    async fetchWithCors(url, options = {}) {
+    async fetchWithCors(url) {
         try {
             const response = await fetch(this.corsProxy + url, {
+                method: 'GET',
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    ...options.headers
-                }
+                    'Origin': window.location.origin,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                mode: 'cors'
             });
 
             if (response.status === 404) {
@@ -58,6 +80,9 @@ class DrednotDataViewer {
 
             return response;
         } catch (error) {
+            if (error.message.includes('Missing required request header')) {
+                this.showCorsError();
+            }
             console.error(`Error fetching ${url}:`, error);
             throw error;
         }
@@ -95,11 +120,33 @@ class DrednotDataViewer {
         this.elements.endDate.addEventListener('change', () => this.validateDates());
     }
 
+    showCorsError() {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'cors-error modal';
+        errorDiv.innerHTML = `
+        <div class="modal-content">
+        <h3>⚠️ CORS Access Required</h3>
+        <p>Please follow these steps:</p>
+        <ol>
+        <li>Click <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank">this link</a> to open CORS Anywhere</li>
+        <li>Click the "Request temporary access" button</li>
+        <li>Return here and click "Try Again"</li>
+        </ol>
+        <button class="try-again-btn">Try Again</button>
+        </div>
+        `;
+        document.body.appendChild(errorDiv);
+
+        errorDiv.querySelector('.try-again-btn').addEventListener('click', () => {
+            errorDiv.remove();
+            this.loadData();
+        });
+    }
+
     setDefaultDates() {
-        // Get yesterday's date in UTC
-        const now = new Date();
+        const now = this.currentUTC;
         const yesterday = new Date(now);
-        yesterday.setDate(now.getDate() - 2); // Subtract 2 days to ensure data exists
+        yesterday.setDate(now.getDate() - 2); // Data available up to 2 days ago
 
         const minDate = '2022-11-23';
         const maxDate = this.formatDate(yesterday);
@@ -240,9 +287,9 @@ class DrednotDataViewer {
         return dates;
     }
 
-    // Modified fetch methods
     async loadSummary(year, month, day) {
-        const url = `${this.baseUrl}/${year}_${month}_${day}/summary.json`;
+        const dateStr = this.formatDateForUrl(year, month, day);
+        const url = `${this.baseUrl}/${dateStr}/summary.json`;
         const response = await this.fetchWithCors(url);
         if (!response) return false;
         const data = await response.json();
@@ -251,7 +298,8 @@ class DrednotDataViewer {
     }
 
     async loadShips(year, month, day) {
-        const url = `${this.baseUrl}/${year}_${month}_${day}/ships.json.gz`;
+        const dateStr = this.formatDateForUrl(year, month, day);
+        const url = `${this.baseUrl}/${dateStr}/ships.json.gz`;
         const response = await this.fetchWithCors(url);
         if (!response) return false;
         const compressed = await response.arrayBuffer();
@@ -262,7 +310,8 @@ class DrednotDataViewer {
     }
 
     async loadLogs(year, month, day) {
-        const url = `${this.baseUrl}/${year}_${month}_${day}/log.json.gz`;
+        const dateStr = this.formatDateForUrl(year, month, day);
+        const url = `${this.baseUrl}/${dateStr}/log.json.gz`;
         const response = await this.fetchWithCors(url);
         if (!response) return false;
         const compressed = await response.arrayBuffer();
@@ -405,7 +454,6 @@ class DrednotDataViewer {
         <div class="item-card">
         <h3>${item.name}</h3>
         <p>ID: ${item.id}</p>
-        <p>Type: ${item.type}</p>
         </div>
         `).join('');
 
@@ -466,32 +514,32 @@ class DrednotDataViewer {
         if (!this.data.logs.length) return;
 
         const filtered = this.data.logs.filter(log =>
-        log.zone.toLowerCase().includes(query.toLowerCase()) ||
-        log.src.toLowerCase().includes(query.toLowerCase()) ||
-        log.dst.toLowerCase().includes(query.toLowerCase()) ||
-        log.item.toString().includes(query) ||
-        log.date.includes(query)
+            log.item.toLowerCase().includes(query.toLowerCase()) ||
+            log.zone.toLowerCase().includes(query.toLowerCase()) ||
+            log.src.toLowerCase().includes(query.toLowerCase()) ||
+            log.dst.toLowerCase().includes(query.toLowerCase()) ||
+            log.date.includes(query)
         );
 
         const logsContainer = document.querySelector('.logs-list');
         logsContainer.innerHTML = filtered.slice(0, 100).map(log => `
-        <div class="log-entry">
-        <p>${new Date(log.time * 1000).toLocaleString()}</p>
-        <p>Date: ${log.date}</p>
-        <p>Zone: ${log.zone}</p>
-        <p>Item: ${log.item} (${log.count})</p>
-        <p>Source: ${log.src} → Destination: ${log.dst}</p>
-        </div>
+            <div class="log-entry">
+                <p>${new Date(log.time * 1000).toLocaleString()}</p>
+                <p>Date: ${log.date}</p>
+                <p>Zone: ${log.zone}</p>
+                <p>Item: ${log.item} (${log.count})</p>
+                <p>Source: ${log.src} → Destination: ${log.dst}</p>
+            </div>
         `).join('');
     }
+
 
     filterItems(query) {
         if (!this.data.itemSchema) return;
 
         const filtered = this.data.itemSchema.filter(item =>
         item.name.toLowerCase().includes(query.toLowerCase()) ||
-        item.id.toString().includes(query) ||
-        item.type.toLowerCase().includes(query.toLowerCase())
+        item.id.toString().includes(query)
         );
 
         const itemsContainer = document.querySelector('.items-list');
@@ -499,7 +547,6 @@ class DrednotDataViewer {
         <div class="item-card">
         <h3>${item.name}</h3>
         <p>ID: ${item.id}</p>
-        <p>Type: ${item.type}</p>
         </div>
         `).join('');
     }
