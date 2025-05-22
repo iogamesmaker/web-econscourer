@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Drednot.io Economic Data Viewer</title>
-    <link rel="stylesheet" href="styles.css">
-    <!-- Include pako for gzip decompression -->
+    <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 </head>
 <body>
@@ -13,11 +12,16 @@
         <header>
             <h1>Drednot.io Economic Data Viewer</h1>
             <div class="controls">
-                <select id="instance">
-                    <option value="prod">Production</option>
-                    <option value="test">Test</option>
-                </select>
-                <input type="date" id="dateSelect">
+                <div class="date-range">
+                    <div class="date-input">
+                        <label for="startDate">Start Date:</label>
+                        <input type="date" id="startDate" min="2022-11-23">
+                    </div>
+                    <div class="date-input">
+                        <label for="endDate">End Date:</label>
+                        <input type="date" id="endDate" min="2022-11-23">
+                    </div>
+                </div>
                 <button id="loadData">Load Data</button>
             </div>
         </header>
@@ -32,10 +36,15 @@
             </div>
 
             <div class="data-content">
-                <div id="loading" class="hidden">Loading...</div>
+                <div id="loading" class="hidden">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">Loading Data...</div>
+                    <div class="loading-progress"></div>
+                </div>
 
                 <div id="summary" class="tab-content active">
                     <h2>Summary Data</h2>
+                    <div class="date-range-info"></div>
                     <div class="summary-stats"></div>
                 </div>
 
@@ -64,6 +73,6 @@
             </div>
         </main>
     </div>
-    <script src="script.js"></script>
+    <script src="js/script.js"></script>
 </body>
 </html>
