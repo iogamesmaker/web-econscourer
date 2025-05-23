@@ -345,14 +345,17 @@ class DrednotDataViewer {
             date: `${year}-${month}-${day}`
         };
 
-        // Stack identical transactions
-        const key = `${processedEntry.time}_${processedEntry.zone}_${processedEntry.src}_${processedEntry.dst}_${processedEntry.item}_${processedEntry.count}`;
+        // Stack identical transactions by combining their counts
+        // Remove time from the key to group transactions regardless of exact timestamp
+        const key = `${processedEntry.zone}_${processedEntry.src}_${processedEntry.dst}_${processedEntry.item}`;
 
         if (this.data.logsMap.has(key)) {
             const existing = this.data.logsMap.get(key);
-            existing.repetitions = (existing.repetitions || 1) + 1;
+            existing.count += processedEntry.count;
+            // Keep the earliest time
+            existing.time = Math.min(existing.time, processedEntry.time);
         } else {
-            this.data.logsMap.set(key, { ...processedEntry, repetitions: 1 });
+            this.data.logsMap.set(key, processedEntry);
         }
     }
 
@@ -368,50 +371,59 @@ class DrednotDataViewer {
             const decompressed = pako.ungzip(new Uint8Array(compressed));
             const text = new TextDecoder('utf-8').decode(decompressed);
 
-            // Split by comma and clean up the entries
-            const entries = text.split('},')
-            .map(entry => {
-                // Add closing brace if it was removed by split
-                entry = entry.trim();
-                if (!entry.endsWith('}')) {
-                    entry += '}';
-                }
-                // Remove any leading comma
-                if (entry.startsWith(',')) {
-                    entry = entry.substring(1);
-                }
-                return entry;
-            })
-            .filter(entry => entry.length > 2); // Remove empty entries
+            // First, ensure the text is wrapped in square brackets to make it a valid JSON array
+            const jsonText = text.trim();
+            const validJsonText = jsonText.startsWith('[') ? jsonText : `[${jsonText}]`;
 
-            // Process entries in chunks
-            const chunkSize = 1000;
-            for (let i = 0; i < entries.length; i += chunkSize) {
-                const chunk = entries.slice(i, i + chunkSize);
+            try {
+                // Try to parse the entire text as one JSON array
+                const entries = JSON.parse(validJsonText);
 
-                for (const entry of chunk) {
-                    try {
-                        const logEntry = JSON.parse(entry);
-                        this.processLogEntry(logEntry, year, month, day);
-                    } catch (e) {
-                        console.error('Error parsing entry:', entry);
-                        console.error('Parse error:', e);
+                // Process entries in chunks
+                const chunkSize = 1000;
+                for (let i = 0; i < entries.length; i += chunkSize) {
+                    const chunk = entries.slice(i, i + chunkSize);
+
+                    for (const entry of chunk) {
+                        this.processLogEntry(entry, year, month, day);
+                    }
+
+                    // Allow UI updates
+                    if (i % (chunkSize * 5) === 0) {
+                        await new Promise(resolve => setTimeout(resolve, 0));
                     }
                 }
 
-                // Allow UI updates
-                if (i % (chunkSize * 5) === 0) {
-                    await new Promise(resolve => setTimeout(resolve, 0));
-                }
-            }
+                return true;
+            } catch (parseError) {
+                // If parsing as a whole array fails, fall back to line-by-line parsing
+                const entries = jsonText.split('\n')
+                .map(line => line.trim())
+                .filter(line => line && line !== '[' && line !== ']')
+                .map(line => {
+                    // Remove trailing commas and ensure proper JSON formatting
+                    line = line.replace(/,$/, '');
+                    try {
+                        return JSON.parse(line);
+                    } catch (e) {
+                        console.warn('Failed to parse log entry:', line);
+                        return null;
+                    }
+                })
+                .filter(entry => entry !== null);
 
-            return true;
+                // Process the valid entries
+                for (const entry of entries) {
+                    this.processLogEntry(entry, year, month, day);
+                }
+
+                return true;
+            }
         } catch (error) {
             console.error(`Error loading logs for ${dateStr}:`, error);
             return false;
         }
     }
-
 
     async loadItemSchema() {
         const url = `${this.baseUrl}/item_schema.json`;
@@ -622,7 +634,6 @@ class DrednotDataViewer {
             const dst = this.escapeHtml(log.dst);
             const itemName = this.escapeHtml(this.getItemName(log.item));
             const count = log.count.toLocaleString();
-            const repetitions = log.repetitions.toLocaleString();
 
             return `
                 <div class="virtual-row" style="transform: translateY(${(start + index) * this.virtualScrolling.rowHeight}px)">
@@ -632,7 +643,6 @@ class DrednotDataViewer {
                     <div class="cell dst" title="${dst}">${dst}</div>
                     <div class="cell item" title="${itemName}">${itemName}</div>
                     <div class="cell count">${count}</div>
-                    <div class="cell repetitions">${repetitions}</div>
                 </div>
             `;
         }).join('');
@@ -751,7 +761,6 @@ class DrednotDataViewer {
                         <div class="cell dst">Destination</div>
                         <div class="cell item">Item</div>
                         <div class="cell count">Count</div>
-                        <div class="cell repetitions">Repeated</div>
                     </div>
                 </div>
                 <div class="virtual-scroll-container">
