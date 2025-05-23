@@ -261,3 +261,155 @@ input[type="text"] {
     border-radius: 4px;
     margin-bottom: 1rem;
 }
+
+.log-filters {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.log-filters input {
+    flex: 1;
+    min-width: 200px;
+}
+
+.logs-table {
+    overflow-x: auto;
+}
+
+.logs-table table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.logs-table th,
+.logs-table td {
+    padding: 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid var(--secondary-color);
+}
+
+.logs-table th {
+    background-color: var(--primary-color);
+    position: sticky;
+    top: 0;
+}
+
+.logs-table tr:hover {
+    background-color: var(--primary-color);
+}
+
+#clearFilters {
+background-color: var(--error-color);
+border: none;
+padding: 0.5rem 1rem;
+}
+
+#clearFilters:hover {
+background-color: #c0392b;
+}
+
+@media (max-width: 768px) {
+    .log-filters {
+        flex-direction: column;
+    }
+
+    .log-filters input {
+        width: 100%;
+    }
+
+    .logs-table {
+        font-size: 0.9rem;
+    }
+}
+
+.virtual-scroll-container {
+    height: 600px;
+    overflow-y: auto;
+    position: relative;
+    border: 1px solid var(--secondary-color);
+}
+
+.virtual-scroll-content {
+    position: relative;
+}
+
+.virtual-row {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 40px;
+    display: grid;
+    grid-template-columns: 180px 120px 1fr 1fr 200px 80px 100px;
+    gap: 8px;
+    padding: 8px;
+    background-color: var(--secondary-color);
+    border-bottom: 1px solid var(--primary-color);
+}
+
+.virtual-row .cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 8px;
+}
+
+.virtual-row .cell {
+    position: relative;
+}
+
+.virtual-row .cell:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: 0;
+    top: 100%;
+    background: var(--primary-color);
+    padding: 4px 8px;
+    border-radius: 4px;
+    z-index: 1;
+    white-space: normal;
+    max-width: 300px;
+}
+
+.virtual-row .cell.time {
+    font-family: monospace;
+}
+
+.virtual-row .cell.count,
+.virtual-row .cell.repetitions {
+    text-align: right;
+}
+
+.virtual-row:hover {
+    background-color: var(--primary-color);
+}
+
+.virtual-row > div {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.log-stats {
+    display: flex;
+    gap: 1rem;
+    margin-left: auto;
+    font-size: 0.9rem;
+    color: var(--accent-color);
+}
+
+/* Update existing styles */
+.log-filters {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--background-color);
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--secondary-color);
+}
+
+.logs-table {
+    margin-top: 1rem;
+}
