@@ -41,6 +41,13 @@ class DrednotDataViewer {
         this.setDefaultDates();
         this.showCorsWarning();
         this.showCurrentTime();
+        this.corsProxies = [
+            'https://cors-anywhere.herokuapp.com/',
+            'https://api.allorigins.win/raw?url=',
+            'https://api.codetabs.com/v1/proxy?quest='
+        ];
+        this.currentProxyIndex = 0;
+        this.retriesPerProxy = 3;
     }
 
     formatDateForUrl(year, month, day) {
@@ -82,33 +89,49 @@ class DrednotDataViewer {
         });
     }
 
-    async fetchWithCors(url) {
-        try {
-            const response = await fetch(this.corsProxy + url, {
-                method: 'GET',
-                headers: {
-                    'Origin': window.location.origin,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                mode: 'cors'
-            });
+    async fetchWithRetry(url, proxyUrl, retries = 3) {
+        for (let i = 0; i < retries; i++) {
+            try {
+                const response = await fetch(proxyUrl + url, {
+                    method: 'GET',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
 
-            if (response.status === 404) {
-                console.warn(`Resource not found: ${url}`);
-                return null;
-            }
+                if (response.ok) {
+                    return response;
+                }
 
-            if (!response.ok) {
+                if (response.status === 404) {
+                    return null;
+                }
+
+                // If we get here, it's an error but not 404
                 throw new Error(`HTTP error! status: ${response.status}`);
+            } catch (error) {
+                if (i === retries - 1) throw error;
+                await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
             }
+        }
+    }
 
-            return response;
-        } catch (error) {
-            if (error.message.includes('Missing required request header')) {
-                this.showCorsError();
+    async fetchWithCors(url) {
+        for (let i = 0; i < this.corsProxies.length; i++) {
+            try {
+                const proxyUrl = this.corsProxies[this.currentProxyIndex];
+                const response = await this.fetchWithRetry(url, proxyUrl);
+                return response;
+            } catch (error) {
+                console.warn(`Proxy ${this.corsProxies[this.currentProxyIndex]} failed:`, error);
+                // Try next proxy
+                this.currentProxyIndex = (this.currentProxyIndex + 1) % this.corsProxies.length;
+
+                if (i === this.corsProxies.length - 1) {
+                    throw error;
+                }
             }
-            console.error(`Error fetching ${url}:`, error);
-            throw error;
         }
     }
 
@@ -218,10 +241,13 @@ class DrednotDataViewer {
         const errorContainer = document.createElement('div');
         errorContainer.className = 'error-message';
         errorContainer.innerHTML = `
-        <h3>⚠️ Warnings</h3>
-        <ul>
-        ${errors.map(error => `<li>${error}</li>`).join('')}
-        </ul>
+            <h3>⚠️ Warnings (${errors.length})</h3>
+            <p>Some data could not be loaded. The displayed information may be incomplete.</p>
+            <div class="error-details" style="max-height: 200px; overflow-y: auto;">
+                <ul>
+                    ${errors.map(error => `<li>${error}</li>`).join('')}
+                </ul>
+            </div>
         `;
 
         const existingError = document.querySelector('.error-message');
@@ -245,10 +271,6 @@ class DrednotDataViewer {
         this.showLoading(true);
         this.clearData();
 
-        const startDate = new Date(this.elements.startDate.value);
-        const endDate = new Date(this.elements.endDate.value);
-        const dateRange = this.getDateRange(startDate, endDate);
-
         try {
             // First load static data
             await Promise.all([
@@ -256,41 +278,55 @@ class DrednotDataViewer {
                               this.loadBotDrops()
             ]);
 
-            // Then load date-specific data with progress tracking
+            // Load ships data in smaller chunks to avoid overwhelming the proxies
+            const startDate = new Date('2022-11-23');
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() - 2);
+
+            const dateRange = this.getDateRange(startDate, endDate);
             let completed = 0;
             let errors = [];
             const total = dateRange.length;
 
-            for (const date of dateRange) {
-                const [year, month, day] = date.split('-');
-                try {
-                    const results = await Promise.all([
-                        this.loadSummary(year, month, day),
-                                                      this.loadShips(year, month, day),
-                                                      this.loadLogs(year, month, day)
-                    ]);
+            // Initialize ships history storage
+            this.data.shipsHistory = new Map();
 
-                    // Check if any of the requests failed
-                    if (results.some(r => r === false)) {
-                        errors.push(`Data not available for ${date}`);
+            // Process in chunks of 7 days
+            const chunkSize = 7;
+            for (let i = 0; i < dateRange.length; i += chunkSize) {
+                const chunk = dateRange.slice(i, i + chunkSize);
+
+                // Process each date in the chunk with a delay between requests
+                for (const date of chunk) {
+                    const [year, month, day] = date.split('-');
+                    try {
+                        await this.loadShips(year, month, day);
+                        // Add a small delay between requests
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    } catch (error) {
+                        errors.push(`Error loading ships for ${date}: ${error.message}`);
                     }
-                } catch (error) {
-                    errors.push(`Error loading data for ${date}: ${error.message}`);
+
+                    completed++;
+                    this.updateProgress(completed / total * 100);
                 }
 
-                completed++;
-                this.updateProgress(completed / total * 100);
+                // Add a larger delay between chunks
+                if (i + chunkSize < dateRange.length) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
             }
 
             if (errors.length > 0) {
                 this.showErrors(errors);
             }
 
-            if (this.data.summaries.length > 0) {
+            if (this.data.shipsHistory.size > 0) {
                 this.updateUI();
             } else {
-                throw new Error('No data available for the selected date range');
+                throw new Error('No ship data available for the selected date range');
             }
+
         } catch (error) {
             console.error('Error loading data:', error);
             this.showErrors([error.message]);
@@ -326,10 +362,34 @@ class DrednotDataViewer {
         const url = `${this.baseUrl}/${dateStr}/ships.json.gz`;
         const response = await this.fetchWithCors(url);
         if (!response) return false;
+
         const compressed = await response.arrayBuffer();
         const decompressed = pako.ungzip(new Uint8Array(compressed), { to: 'string' });
-        const data = JSON.parse(decompressed);
-        this.data.ships.push(...data.map(ship => ({ ...ship, date: `${year}-${month}-${day}` })));
+        const ships = JSON.parse(decompressed);
+        const date = `${year}-${month}-${day}`;
+
+        // Process each ship
+        ships.forEach(ship => {
+            if (!this.data.shipsHistory.has(ship.hex_code)) {
+                this.data.shipsHistory.set(ship.hex_code, []);
+            }
+
+            // Convert item IDs to names
+            const namedItems = {};
+            for (const [itemId, count] of Object.entries(ship.items)) {
+                const itemName = this.getItemName(parseInt(itemId));
+                namedItems[itemName] = count;
+            }
+
+            // Add daily record
+            this.data.shipsHistory.get(ship.hex_code).push({
+                date,
+                name: ship.name.trim(),
+                                                           color: ship.color,
+                                                           items: namedItems
+            });
+        });
+
         return true;
     }
 
@@ -518,20 +578,104 @@ class DrednotDataViewer {
         summaryContainer.innerHTML = html;
     }
 
+    showShipHistory(hexCode) {
+        const history = this.data.shipsHistory.get(hexCode);
+        const modal = document.getElementById('shipHistoryModal');
+        const content = document.getElementById('shipHistoryContent');
+
+        if (!history || history.length === 0) {
+            content.innerHTML = '<p>No history available for this ship.</p>';
+            modal.style.display = "block";
+            return;
+        }
+
+        let html = `<h2>Ship History - ${hexCode}</h2>`;
+        html += '<div class="history-timeline">';
+
+        history.forEach((record, index) => {
+            const prevRecord = index > 0 ? history[index - 1] : null;
+            const nameChanged = prevRecord && prevRecord.name !== record.name;
+            const itemsChanged = prevRecord && JSON.stringify(record.items) !== JSON.stringify(prevRecord.items);
+
+            html += `
+                <div class="history-entry ${nameChanged ? 'name-changed' : ''} ${itemsChanged ? 'items-changed' : ''}">
+                    <h3 class="date">${record.date}</h3>
+                    <p class="name" style="color: #${record.color.toString(16).padStart(6, '0')}">
+                        Name: ${record.name || 'Unnamed Ship'}
+                        ${nameChanged ? ' <span class="changed">(Changed)</span>' : ''}
+                    </p>
+                    <div class="items">
+                        <h4>Inventory${itemsChanged ? ' <span class="changed">(Changed)</span>' : ''}</h4>
+                        <ul>
+                            ${Object.entries(record.items)
+                                .sort(([aName], [bName]) => aName.localeCompare(bName))
+                                .map(([itemName, count]) => `
+                                    <li>${itemName}: ${count.toLocaleString()}</li>
+                                `).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        content.innerHTML = html;
+        modal.style.display = "block";
+    }
+
     updateShips() {
         const shipsContainer = document.querySelector('.ships-list');
-        const ships = this.data.ships.slice(0, 100);
 
-        const html = ships.map(ship => `
-        <div class="ship-card">
-        <h3 style="color: #${ship.color.toString(16).padStart(6, '0')}">${ship.name}</h3>
-        <p>ID: ${ship.hex_code}</p>
-        <p>Date: ${ship.date}</p>
-        <p>Items: ${Object.keys(ship.items).length}</p>
-        </div>
-        `).join('');
+        // Create a map of ships with their latest data
+        const latestShipData = new Map();
+
+        for (const [hexCode, history] of this.data.shipsHistory) {
+            if (history.length > 0) {
+                latestShipData.set(hexCode, history[history.length - 1]);
+            }
+        }
+
+        // Convert to array and sort by name
+        const ships = Array.from(latestShipData.entries())
+            .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+
+        const html = `
+            <div class="ships-grid">
+                ${ships.map(([hexCode, ship]) => `
+                    <div class="ship-card" data-hex="${hexCode}">
+                        <h3 style="color: #${ship.color.toString(16).padStart(6, '0')}">${ship.name || 'Unnamed Ship'}</h3>
+                        <p>ID: ${hexCode}</p>
+                        <button class="view-history-btn">View History</button>
+                    </div>
+                `).join('')}
+            </div>
+            <div id="shipHistoryModal" class="modal">
+                <div class="modal-content">
+                    <span class="close">&times;</span>
+                    <div id="shipHistoryContent"></div>
+                </div>
+            </div>
+        `;
 
         shipsContainer.innerHTML = html;
+
+        // Add click handlers for history buttons
+        shipsContainer.querySelectorAll('.view-history-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const hexCode = e.target.closest('.ship-card').dataset.hex;
+                this.showShipHistory(hexCode);
+            });
+        });
+
+        // Modal close button
+        const modal = document.getElementById('shipHistoryModal');
+        const span = modal.querySelector('.close');
+        span.onclick = () => modal.style.display = "none";
+        window.onclick = (event) => {
+            if (event.target === modal) {
+                modal.style.display = "none";
+            }
+        };
     }
 
     stackIdenticalTransactions(logs) {
