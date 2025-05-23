@@ -520,3 +520,62 @@ background-color: #c0392b;
     color: #888;
     margin: 0 0 0.5rem 0;
 }
+
+.cache-status {
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.status-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.status-header h3 {
+    margin: 0;
+    flex-grow: 1;
+}
+
+.refresh-cache, .clear-cache {
+    background: #444;
+    border: none;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.refresh-cache:hover, .clear-cache:hover {
+    background: #555;
+}
+
+.clear-cache {
+    background: #662222;
+}
+
+.clear-cache:hover {
+    background: #773333;
+}
+
+.status-info {
+    font-family: monospace;
+    color: #ccc;
+}
+
+.status-info p {
+    margin: 0.5rem 0;
+}
+
+.cache-progress {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #444;
+}
+
+.cache-progress.hidden {
+    display: none;
+}

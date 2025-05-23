@@ -34,13 +34,6 @@ class DrednotDataViewer {
         this.maxChunkSize = 1024 * 1024 * 64; // 64MB chunks
         this.currentOffset = 0;
         this.isProcessing = false;
-        // Add current UTC time
-        this.currentUTC = new Date();
-        this.initializeElements();
-        this.addEventListeners();
-        this.setDefaultDates();
-        this.showCorsWarning();
-        this.showCurrentTime();
         this.corsProxies = [
             'https://cors-anywhere.herokuapp.com/',
             'https://api.allorigins.win/raw?url=',
@@ -48,6 +41,129 @@ class DrednotDataViewer {
         ];
         this.currentProxyIndex = 0;
         this.retriesPerProxy = 3;
+        this.cacheVersion = '1';
+        this.maxConcurrentDownloads = 7;
+        this.currentUTC = new Date();
+        this.cacheEnabled = true;
+
+        this.showCurrentTime();
+        this.initializeElements();
+        this.addEventListeners();
+        this.initializeDB().then(() => {
+            this.initializeCacheStatus();
+        });
+        this.setDefaultDates();
+        this.showCorsWarning();
+    }
+
+    async initializeDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('ShipLogsDB', 1);
+
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                this.db = request.result;
+                resolve();
+            };
+
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('shipLogs')) {
+                    db.createObjectStore('shipLogs', { keyPath: 'date' });
+                }
+            };
+        });
+    }
+
+    async getFromCache(date) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['shipLogs'], 'readonly');
+            const store = transaction.objectStore('shipLogs');
+            const request = store.get(date);
+
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getStorageUsage() {
+        if ('storage' in navigator && 'estimate' in navigator.storage) {
+            const estimate = await navigator.storage.estimate();
+            return {
+                used: estimate.usage || 0,
+                quota: estimate.quota || 0
+            };
+        }
+        return { used: 0, quota: 0 };
+    }
+
+    async getCachedDaysCount() {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['shipLogs'], 'readonly');
+            const store = transaction.objectStore('shipLogs');
+            const request = store.count();
+
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    initializeCacheStatus() {
+        const statusDiv = document.createElement('div');
+        statusDiv.className = 'cache-status';
+        statusDiv.innerHTML = `
+            <div class="status-header">
+                <h3>Data Status</h3>
+                <button class="refresh-cache">Refresh All Data</button>
+                <button class="clear-cache">Clear Cache</button>
+            </div>
+            <div class="status-info">
+                <p>Current UTC: ${this.formatDateTime(this.currentUTC)}</p>
+                <p>Cached Days: <span class="cached-days">Calculating...</span></p>
+                <p>Storage Used: <span class="storage-used">Calculating...</span></p>
+            </div>
+            <div class="cache-progress hidden">
+                <div class="progress-bar"></div>
+                <div class="progress-text"></div>
+            </div>
+        `;
+
+        document.querySelector('.controls').appendChild(statusDiv);
+
+        // Add event listeners
+        statusDiv.querySelector('.refresh-cache').addEventListener('click', () => this.refreshCache());
+        statusDiv.querySelector('.clear-cache').addEventListener('click', () => this.clearAllCache());
+
+        // Update cache stats
+        this.updateCacheStats();
+    }
+
+    updateCacheStats() {
+        const cachedDays = this.getCachedDaysCount();
+        const storageUsed = this.getStorageUsage();
+
+        document.querySelector('.cached-days').textContent = `${cachedDays} days`;
+        document.querySelector('.storage-used').textContent =
+        `${(storageUsed.used / (1024 * 1024)).toFixed(2)}MB / ${(storageUsed.quota / (1024 * 1024)).toFixed(2)}MB`;
+    }
+
+    getStorageUsage() {
+        let used = 0;
+        for (let key in localStorage) {
+            if (localStorage.hasOwnProperty(key)) {
+                used += localStorage[key].length * 2; // approximate size in bytes
+            }
+        }
+        return {
+            used,
+            quota: 5 * 1024 * 1024 // 5MB default quota
+        };
+    }
+
+    getCachedDaysCount() {
+        return Object.keys(localStorage)
+        .filter(key => key.startsWith('ships_'))
+        .length;
     }
 
     formatDateForUrl(year, month, day) {
@@ -63,8 +179,29 @@ class DrednotDataViewer {
         document.querySelector('.controls').appendChild(timeDisplay);
     }
 
+    clearAllCache() {
+        if (!confirm('This will delete all cached ship data. Continue?')) return;
+
+        const keys = Object.keys(localStorage)
+        .filter(key => key.startsWith('ships_'));
+        keys.forEach(key => localStorage.removeItem(key));
+
+        this.updateCacheStats();
+    }
+
     formatDateTime(date) {
         return date.toISOString().slice(0, 19).replace('T', ' ');
+    }
+
+    async saveToCache(date, data) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['shipLogs'], 'readwrite');
+            const store = transaction.objectStore('shipLogs');
+            const request = store.put({ date, data });
+
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
     }
 
     showCorsWarning() {
@@ -115,6 +252,72 @@ class DrednotDataViewer {
                 await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
             }
         }
+    }
+
+    async loadShipsWithCache(year, month, day) {
+        const date = `${year}-${month}-${day}`;
+        const cached = await this.getFromCache(date);
+
+        if (cached) {
+            cached.data.forEach(ship => this.processShipData(ship, date));
+            return;
+        }
+
+        const dateStr = this.formatDateForUrl(year, month, day);
+        const url = `${this.baseUrl}/${dateStr}/ships.json.gz`;
+
+        const response = await this.fetchWithCors(url);
+        if (!response) return;
+
+        const compressed = await response.arrayBuffer();
+        const decompressed = pako.ungzip(new Uint8Array(compressed), { to: 'string' });
+        const ships = JSON.parse(decompressed);
+
+        // Cache the data
+        await this.saveToCache(date, ships);
+
+        // Process the ships
+        ships.forEach(ship => this.processShipData(ship, date));
+    }
+
+    async refreshCache() {
+        if (!confirm('This will redownload all ship data. Continue?')) return;
+
+        const cacheProgress = document.querySelector('.cache-progress');
+        cacheProgress.classList.remove('hidden');
+
+        // Clear existing ship data but keep other settings
+        const keys = Object.keys(localStorage)
+        .filter(key => key.startsWith('ships_'));
+        keys.forEach(key => localStorage.removeItem(key));
+
+        // Reload all data
+        await this.loadData();
+    }
+
+    async clearAllCache() {
+        if (!confirm('This will delete all cached ship data. Continue?')) return;
+
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['shipLogs'], 'readwrite');
+            const store = transaction.objectStore('shipLogs');
+            const request = store.clear();
+
+            request.onsuccess = () => {
+                this.updateCacheStats();
+                resolve();
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async updateCacheStats() {
+        const cachedDays = await this.getCachedDaysCount();
+        const storageUsed = await this.getStorageUsage();
+
+        document.querySelector('.cached-days').textContent = `${cachedDays} days`;
+        document.querySelector('.storage-used').textContent =
+        `${(storageUsed.used / (1024 * 1024)).toFixed(2)}MB / ${(storageUsed.quota / (1024 * 1024)).toFixed(2)}MB`;
     }
 
     async fetchWithCors(url) {
@@ -267,65 +470,166 @@ class DrednotDataViewer {
         this.data.logs = [];
     }
 
+    processShipData(ship, date) {
+        if (!this.data.shipsHistory.has(ship.hex_code)) {
+            this.data.shipsHistory.set(ship.hex_code, []);
+        }
+
+        // Convert item IDs to names
+        const namedItems = {};
+        for (const [itemId, count] of Object.entries(ship.items)) {
+            const itemName = this.getItemName(parseInt(itemId));
+            namedItems[itemName] = count;
+        }
+
+        this.data.shipsHistory.get(ship.hex_code).push({
+            date,
+            name: ship.name.trim(),
+            color: ship.color,
+            items: namedItems
+        });
+    }
+
+    updateDetailedProgress(completed, total, currentDate, isError = false) {
+        const progressBar = this.elements.loadingProgress;
+        const percentage = (completed / total) * 100;
+
+        if (!progressBar.querySelector('.loading-progress-bar')) {
+            progressBar.innerHTML = `
+                <div class="loading-progress-bar"></div>
+                <div class="loading-details"></div>
+            `;
+        }
+
+        progressBar.querySelector('.loading-progress-bar').style.width = `${percentage}%`;
+        progressBar.querySelector('.loading-details').innerHTML = `
+            <div class="progress-text">
+                Loading: ${completed}/${total} (${percentage.toFixed(1)}%)
+                <br>
+                Current: ${currentDate} ${isError ? '❌' : '✓'}
+            </div>
+        `;
+    }
+
+    async loadShipsWithCache(year, month, day) {
+        const cacheKey = `ships_${year}_${month}_${day}_v${this.cacheVersion}`;
+
+        // Try to get from cache first
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            const age = (Date.now() - timestamp) / (1000 * 60 * 60); // age in hours
+            // Process cached data
+            data.forEach(ship => this.processShipData(ship, `${year}-${month}-${day}`));
+            return;
+        }
+
+        // If not in cache or expired, download
+        const dateStr = this.formatDateForUrl(year, month, day);
+        const url = `${this.baseUrl}/${dateStr}/ships.json.gz`;
+        const response = await this.fetchWithCors(url);
+
+        if (!response) return;
+
+        const compressed = await response.arrayBuffer();
+        const decompressed = pako.ungzip(new Uint8Array(compressed), { to: 'string' });
+        const ships = JSON.parse(decompressed);
+
+        // Cache the data
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify({
+                data: ships,
+                timestamp: Date.now()
+            }));
+        } catch (e) {
+            // If localStorage is full, clear old entries
+            if (e.name === 'QuotaExceededError') {
+                this.clearOldCache();
+            }
+        }
+
+        // Process the ships
+        ships.forEach(ship => this.processShipData(ship, `${year}-${month}-${day}`));
+    }
+
+    clearOldCache() {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith('ships_')) {
+                keys.push(key);
+            }
+        }
+
+        // Sort by timestamp and remove oldest entries until we're under quota
+        keys.sort((a, b) => {
+            const aData = JSON.parse(localStorage.getItem(a));
+            const bData = JSON.parse(localStorage.getItem(b));
+            return bData.timestamp - aData.timestamp;
+        });
+
+        // Remove oldest 20% of entries
+        const toRemove = Math.ceil(keys.length * 0.2);
+        keys.slice(-toRemove).forEach(key => localStorage.removeItem(key));
+    }
+
     async loadData() {
         this.showLoading(true);
         this.clearData();
 
         try {
-            // First load static data
+            // Load static data first
             await Promise.all([
                 this.loadItemSchema(),
                               this.loadBotDrops()
             ]);
 
-            // Load ships data in smaller chunks to avoid overwhelming the proxies
             const startDate = new Date('2022-11-23');
-            const endDate = new Date();
-            endDate.setDate(endDate.getDate() - 2);
-
+            const endDate = this.currentUTC;
             const dateRange = this.getDateRange(startDate, endDate);
-            let completed = 0;
-            let errors = [];
-            const total = dateRange.length;
 
             // Initialize ships history storage
             this.data.shipsHistory = new Map();
 
-            // Process in chunks of 7 days
-            const chunkSize = 7;
-            for (let i = 0; i < dateRange.length; i += chunkSize) {
-                const chunk = dateRange.slice(i, i + chunkSize);
-
-                // Process each date in the chunk with a delay between requests
-                for (const date of chunk) {
-                    const [year, month, day] = date.split('-');
-                    try {
-                        await this.loadShips(year, month, day);
-                        // Add a small delay between requests
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    } catch (error) {
-                        errors.push(`Error loading ships for ${date}: ${error.message}`);
-                    }
-
-                    completed++;
-                    this.updateProgress(completed / total * 100);
-                }
-
-                // Add a larger delay between chunks
-                if (i + chunkSize < dateRange.length) {
-                    await new Promise(resolve => setTimeout(resolve, 2000));
+            // First, load all cached data
+            let uncachedDates = [];
+            for (const date of dateRange) {
+                const cached = await this.getFromCache(date);
+                if (cached) {
+                    cached.data.forEach(ship => this.processShipData(ship, date));
+                } else {
+                    uncachedDates.push(date);
                 }
             }
 
-            if (errors.length > 0) {
-                this.showErrors(errors);
+            // Then download any missing data
+            if (uncachedDates.length > 0) {
+                const total = uncachedDates.length;
+                let completed = 0;
+
+                while (uncachedDates.length > 0) {
+                    const batch = uncachedDates.splice(0, this.maxConcurrentDownloads);
+                    const promises = batch.map(date => {
+                        const [year, month, day] = date.split('-');
+                        return this.loadShipsWithCache(year, month, day)
+                        .then(() => {
+                            completed++;
+                            this.updateDetailedProgress(completed, total, date);
+                        })
+                        .catch(error => {
+                            console.error(`Failed to load ${date}:`, error);
+                            completed++;
+                            this.updateDetailedProgress(completed, total, date, true);
+                            return Promise.reject(error);
+                        });
+                    });
+
+                    await Promise.allSettled(promises);
+                }
             }
 
-            if (this.data.shipsHistory.size > 0) {
-                this.updateUI();
-            } else {
-                throw new Error('No ship data available for the selected date range');
-            }
+            this.updateUI();
+            await this.updateCacheStats();
 
         } catch (error) {
             console.error('Error loading data:', error);
